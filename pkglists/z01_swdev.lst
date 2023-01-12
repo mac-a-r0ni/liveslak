@@ -1,0 +1,16 @@
+# min.lst:
+glibc
+libmpc
+mpfr
+# noxbase.lst:
+bison
+flex
+gcc
+gccmakedep
+guile
+intltool
+make
+# z00_plasma5supp.lst:
+gcc-g++
+gcc-gfortran
+

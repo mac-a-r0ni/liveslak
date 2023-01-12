@@ -1,0 +1,15 @@
+#FAudio
+#MinGW-w64
+boost-compat
+dropbox-client
+fdk-aac
+gst-plugins-ffmpeg0
+mbedtls
+obs-studio
+openjdk11
+openconnect
+soxr
+unrar
+#vkd3d
+#wine
+x264

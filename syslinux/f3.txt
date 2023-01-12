@@ -1,0 +1,56 @@
+==  Tweaks for the boot commandline ==
+
+To boot with default values just press ENTER.
+
+=== Media tweaks ===
+
+cfg=[skip|write] =>
+  Specify 'skip' to skip disk-based configuration file containing
+  OS parameters; or specify 'write' to write current OS parameters
+  to disk.
+
+domain=your_custom_domain =>
+  Specify a custom domain name.  Defaults to 'example.net'.
+
+hostname=your_custom_hostname[,qualifier] =>
+  Specify a custom hostname.  A qualifier 'fixed' can be appended
+  to prohibit hostname modification in  case of network boot.
+
+livemedia=/dev/sdX => Tell the init script which partition
+  contains the Slackware Live OS you want to boot. This can
+  become necessary if you have another copy of Slackware Live
+  installed in another partition.  Also accepted: UUID or LABEL.
+
+livemedia=/dev/sdX:/path/to/live.iso
+livemedia=scandev:/path/to/live.iso => Use this if you want to
+  load the live OS from an ISO file on a local harddisk partition.
+
+livemain=directoryname => Use this if you copied the content
+  of the ISO to a different directory than "liveslak".
+
+nop => No persistence, i.e. boot the virgin installation in
+  case your "persistence" directory got corrupted.
+  If you want to ignore any persistent data during boot,
+  including LUKS data, specify "nop luksvol=" .
+
+nop=wipe => Wipe all data from persistence directory or container.
+  Useful in cases where your persistent data got corrupted.
+
+persistence=name => Use this if you are using a different
+  directory/file than "persistence" for storing persistent data.
+
+persistence=/dev/sdX:/path/to/mypersistence
+persistence=scandev:/path/to/mypersistence => Use this if
+  the persistence directory or container is not located on the USB stick,
+  but on a local hard disk partition. Useful for network (PXE) boot
+  where you still want to offer users persistence.
+
+toram => copy the OS from the media to to RAM before running it.
+  You can remove the boot media after booting.
+
+toram=all => Prevent writes to disk since we are supposed to
+  run from RAM; equivalent to parameter "toram".
+
+toram=os => Load OS modules into RAM, but write persistent data to USB.
+
+== [F1]: Home [F2]: Desktop setup [F4]: HW/debug [F5]: Network boot ==

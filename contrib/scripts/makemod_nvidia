@@ -1,0 +1,45 @@
+#!/bin/sh
+
+MAKEMOD=${MAKEMOD:-"/usr/local/sbin/makemod"}
+SLACKARCH=${SLACKARCH:-"x86_64"}
+SLACKVER=${SLACKVER:-"current"}
+
+TEMPDIR=$(mktemp -d -t alienmod.XXXXXX)
+if [ ! -d ${TEMPDIR} ]; then
+  echo "**Failed to create temporary directory for installation of packages!"
+  exit 1
+fi
+
+# Install the nvidia-kernel and nvidia driver packages which were passed
+# as arguments to the commandline:
+for PKG in $* ; do
+  /sbin/installpkg -root ${TEMPDIR} ${PKG}
+done
+
+# Prevent loading of the kernel's 'nouveau' driver:
+mkdir -p ${TEMPDIR}/etc/modprobe.d
+cat <<EOT > ${TEMPDIR}/etc/modprobe.d/BLACKLIST-nouveau.conf
+# Do not load the kernel nouveau dri module, since it interferes with both
+# the nv and binary nvidia drivers.
+blacklist nouveau
+EOT
+
+STAMP=$(ls ${TEMPDIR}/var/log/packages/nvidia-kernel-* |rev |cut -d- -f3 |rev)
+PKGVER=$(echo $STAMP |cut -d_ -f1)
+PKGMAJ=$(echo $PKGVER |cut -d. -f1)
+KVER=$(echo $STAMP |cut -d_ -f2)
+
+# Generate the squashfs module:
+${MAKEMOD} ${TEMPDIR} /tmp/0060-nvidia-${STAMP}-${SLACKVER}-${SLACKARCH}.sxz
+
+# Generate list of PCI IDS for supported GPUs, sed magic taken from
+# https://anonscm.debian.org/viewvc/pkg-nvidia/packages/nvidia-graphics-drivers/trunk/debian/rules?view=markup :
+sed \
+  -e '0,/A. Supported\|APPENDIX A: SUPPORTED/d' \
+  -e '0,/Appendix A. Supported\|APPENDIX A: SUPPORTED/d' \
+  -e '0,/^Below\|APPENDIX B/{/ 0x/s/.*  0x\([0-9a-fA-F]\{4\}\).*/10de\1/p; /^.\{41\} [0-9a-fA-F]\{4\} /s/^.\{41\} \([0-9a-fA-F]\{4\}\) .*/10de\1/p};d' \
+  ${TEMPDIR}/usr/doc/nvidia-driver-*/README.txt \
+  | tr 'a-f' 'A-F' | sort -u \
+  > /tmp/nvidia-${PKGMAJ}xx.ids
+
+rm -r ${TEMPDIR}

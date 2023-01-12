@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Root of all my slackbuilds:
+SBROOT=${SBROOT:-"/home/slackbuilds"}
+
+# The makemod script:
+MAKEMOD=${MAKEMOD:-"/usr/local/sbin/makemod"}
+
+# Current directory:
+CWD=$(pwd)
+
+# Package versions for wine and FAudio/vkd3d:
+WINEREL=$(ls ${SBROOT}/wine/pkg64/current/wine-*.t?z |rev |cut -f3 -d- |rev)
+FAUDIOREL=$(ls ${SBROOT}/FAudio/pkg/current/FAudio-*.t?z |rev |cut -f3 -d- |rev)
+VKD3DREL=$(ls ${SBROOT}/vkd3d/pkg/current/vkd3d-*.t?z |rev |cut -f3 -d- |rev)
+
+# Package locations for wine vkd3d and FAudio:
+WINEPKG=$(ls ${SBROOT}/wine/pkg64/current/wine-*.t?z)
+FAUDIOPKG=$(ls ${SBROOT}/FAudio/pkg64/current/FAudio-*.t?z)
+FAUDIOPKG32=$(ls ${SBROOT}/FAudio/pkg/current/FAudio-*.t?z)
+VKD3DPKG=$(ls ${SBROOT}/vkd3d/pkg64/current/vkd3d-*.t?z)
+VKD3DPKG32=$(ls ${SBROOT}/vkd3d/pkg/current/vkd3d-*.t?z)
+
+# Convert the 32bit FAudio into a 'compat32' package:
+convertpkg-compat32 -i ${FAUDIOPKG32} -d /tmp
+
+# Convert the 32bit vkd3d into a 'compat32' package:
+convertpkg-compat32 -i ${VKD3DPKG32} -d /tmp
+
+# Create the SXZ module:
+SCRATCHDIR=$(mktemp -t -d makesxz.XXXXXX)
+installpkg --root $SCRATCHDIR ${WINEPKG}
+installpkg --root $SCRATCHDIR ${FAUDIOPKG}
+installpkg --root $SCRATCHDIR ${VKD3DPKG}
+installpkg --root $SCRATCHDIR /tmp/FAudio-compat32-${FAUDIOREL}-x86_64-*compat32.txz 
+installpkg --root $SCRATCHDIR /tmp/vkd3d-compat32-${VKD3DREL}-x86_64-*compat32.txz 
+$MAKEMOD $SCRATCHDIR $CWD/0060-wine-${WINEREL}-current-x86_64.sxz 
+rm -r $SCRATCHDIR

@@ -1,0 +1,26 @@
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/menu-1.0.dtd">
+<Menu>
+  <Name>Applications</Name>
+  <Menu>
+    <Name>Multimedia</Name>
+      <Exclude>
+        <Category>X-DAW</Category>
+      </Exclude>
+    <Move>
+      <Old>X42 Plugins</Old>
+      <New>Slackware Live Daw/X42 Plugins</New>
+    </Move>
+    <Move>
+      <Old>lsp-plugins</Old>
+      <New>Slackware Live Daw/lsp-plugins</New>
+    </Move>
+    <Menu>
+      <Name>Slackware Live Daw</Name>
+      <Directory>liveslak-daw.directory</Directory>
+      <Include>
+        <Category>X-DAW</Category>
+      </Include>
+    </Menu>
+  </Menu>
+</Menu>
+
