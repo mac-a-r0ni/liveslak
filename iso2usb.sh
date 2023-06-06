@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022  Eric Hameleers, Eindhoven, NL
+# Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL
 # All rights reserved.
 #
 # Redistribution and use of this script, with or without modification, is
@@ -705,7 +705,7 @@ if [ $REFRESH -eq 0 ]; then
   # Create filesystems:
   # Not enough clusters for a 32 bit FAT:
   mkdosfs -s 2 -n "DOS" ${TARGETP1}
-  mkdosfs -F32 -s 2 -n "EFI" ${TARGETP2}
+  mkdosfs -F32 -s 2 -n "ESP" ${TARGETP2}
   # KDE tends to automount.. so try an umount:
   if mount |grep -qw ${TARGETP3} ; then
     umount ${TARGETP3} || true
@@ -718,12 +718,20 @@ if [ $REFRESH -eq 0 ]; then
   # otherwise, the syslinux bootloader (>= 6.03) will fail.
   # Note: older 32bit OS-es will trip over the '^64bit' feature so be gentle.
   mkfs.ext4 -F -F -L "${LIVELABEL}" ${TARGETP3}
-  if ! tune2fs -O ^64bit ${TARGETP3} 1>/dev/null 2>/dev/null ; then
-    FEAT_64BIT=""
-  else
-    FEAT_64BIT="-O ^64bit"
+  UNWANTED_FEAT=""
+  if tune2fs -O ^64bit ${TARGETP3} 1>/dev/null 2>/dev/null ; then
+    UNWANTED_FEAT="^64bit,"
   fi
-  tune2fs -c 0 -i 0 -m 0 ${FEAT_64BIT} ${TARGETP3}
+  # Grub 2.0.6 stumbles over metadata_csum_seed which is enabled by default
+  # since e2fsprogs 1.47.0, so let's disable that too:
+  if tune2fs -O ^metadata_csum_seed ${TARGETP3} 1>/dev/null 2>/dev/null ; then
+    UNWANTED_FEAT="${UNWANTED_FEAT}^metadata_csum_seed,"
+  fi
+  if [ -n "${UNWANTED_FEAT}" ]; then
+    # We found unwanted feature(s), get rid of trailing comma:
+    UNWANTED_FEAT="-O ${UNWANTED_FEAT::-1}"
+  fi
+  tune2fs -c 0 -i 0 -m 0 ${UNWANTED_FEAT} ${TARGETP3}
 else
   # Determine partition names independently of storage architecture:
   TARGETP1=$(fdisk -l $TARGET |grep ^$TARGET |cut -d' ' -f1 |grep -E '[^0-9]1$')

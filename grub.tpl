@@ -73,8 +73,8 @@ menuentry "Help on boot parameters" --hotkey h {
   unset pager 
 } 
 
-@C2RMH@menuentry "Console OS in RAM ($sl_lang)" --hotkey c {
-@C2RMH@  linux ($root)/boot/generic @KAPPEND@ load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 kbd=$sl_kbd tz=$sl_tz locale=$sl_locale xkb=$sl_xkb toram=core 3
-@C2RMH@  initrd ($root)/boot/initrd.img
-@C2RMH@}
+@C2RMS@menuentry "Console OS in RAM ($sl_lang)" --hotkey c {
+@C2RMS@  linux ($root)/boot/generic @KAPPEND@ load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 kbd=$sl_kbd tz=$sl_tz locale=$sl_locale xkb=$sl_xkb toram=core 3
+@C2RMS@  initrd ($root)/boot/initrd.img
+@C2RMS@}
 

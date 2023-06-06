@@ -134,7 +134,7 @@ Note that you can create your own SSL certificate plus private key and use those
 === Boot from an ISO file on disk ===
 
 
-If you downloaded a liveslak ISO file and want to boot that ISO directly from its location on your computer's hard drive, you can use the following Grub configuration block and add it to your ''/boot/grub/grub.cfg'':<code>
+If you downloaded a liveslak ISO file and want to boot that ISO directly from its location on your computer's hard drive, you can use the following Grub configuration block and add it to your ''/boot/grub/grub.cfg'' (the example code assumes you downloaded the XFCE ISO and stored it as ''/data/ISOS/slackware64-live-xfce-current.iso''):<code>
 menuentry " LIVESLAK ISO" --class gnu-linux --class os --class icon-linux {
   set iso='/data/ISOS/slackware64-live-xfce-current.iso'
   set bootparms='load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 kbd=us tz=Europe/Amsterdam lang=nl'
@@ -144,7 +144,7 @@ menuentry " LIVESLAK ISO" --class gnu-linux --class os --class icon-linux {
   linux (loop)/boot/generic livemedia=scandev:$iso $bootparms
   initrd (loop)/boot/initrd.img
 }</code>
-This example will add a 'LIVESLAK ISO' menu entry to your local computer's boot menu, through which you can start a XFCE Live ISO which you previously downloaded to directory ''/data/ISOS/'', pre-configured for a US keyboard, Dutch language and Amsterdam timezone.
+This example will add a 'LIVESLAK ISO' menu entry to your local computer's boot menu, through which you can start a XFCE Live ISO which you previously downloaded to directory ''/data/ISOS/'', pre-configured for a US keyboard, Dutch language and Amsterdam timezone.  You should of course change the ''bootparms'' string so that it matches your requirements.
 
 Alternatively you could look into Ventoy, which is a tool to create a bootable USB drive containing multiple ISO files.  Ventoy allows you to boot from any of these ISOs by automatically generating on every boot a Grub menu containing all the images found on disk.  Liveslak is fully Ventoy-compatible.  Website: https://www.ventoy.net/ .
 
@@ -1089,6 +1089,7 @@ Slackware Live Edition expects its modules to adhere to a particularly loose fil
   * Anything may be part of the '*' but most commonly used is "${VERSION}-${ARCH}".  The core modules in Slackware Live use the Slackware release as ${VERSION} and the Slackware architecture as ${ARCH}.  For the modules in addons/ and optional/ subdirectories, ${VERSION} would commonly be the version of the program that is being made available in the module.
   * The four digits of a modulename have a meaning.  Some ranges are claimed by the core OS, so please do not use them. Their prefixes are based on the package source: <code>
     0000 = contains the Slackware /boot directory
+    0005 = Console OS modules when explicitly enabled for a regular ISO installed otherwise from Slackware tagfiles
     0010-0019 = packages installed from a Slackware tagfile (a,ap,d, ... , y series)
     0020-0029 = packages installed from a package list as found in the ./pkglists subdirectory of the liveslak sources (min, noxbase, x_base, xapbase, xfcebase etc)
     0030-0039 = a 'local' package, i.e. a package found in subdirectory ./local or ./local64 (depending on architecture)

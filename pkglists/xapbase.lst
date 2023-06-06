@@ -43,6 +43,7 @@ polkit-gnome
 python-cffi
 python-pycparser
 rdesktop
+ruby
 rxvt
 rxvt-unicode
 sane

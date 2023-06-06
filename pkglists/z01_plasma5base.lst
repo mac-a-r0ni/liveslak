@@ -44,6 +44,8 @@ kidletime
 kimageformats
 kinit
 kio
+kio-admin
+kirigami-addons
 kirigami2
 kitemmodels
 kitemviews
@@ -363,6 +365,7 @@ spectacle
 #umbrello
 #zanshin
 zeroconf-ioslave
+zxing-cpp
 
 # applications-extra:
 #alkimia
@@ -370,6 +373,7 @@ zeroconf-ioslave
 #calligraplan
 #digikam
 falkon
+ktextaddons
 kColorPicker
 kImageAnnotator
 #krita

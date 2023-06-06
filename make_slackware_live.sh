@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022  Eric Hameleers, Eindhoven, NL 
+# Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL 
 # All rights reserved.
 #
 #   Permission to use, copy, modify, and distribute this software for
@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.6.0.2"
+VERSION="1.7.0"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -179,8 +179,9 @@ ONLY_ISO="NO"
 # The name of the directory used for storing persistence data:
 PERSISTENCE=${PERSISTENCE:-"persistence"}
 
-# Add a Core OS to load into RAM (currently supported for XFCE, LEAN, DAW):
+# Add a Core OS to load into RAM (value can be 'NO', 'YES' or 'NATIVE'):
 CORE2RAM=${CORE2RAM:-"NO"}
+# The MINLIST module must always be the first in CORE2RAMMODS:
 CORE2RAMMODS="${MINLIST} noxbase"
 
 # Slackware version to use (note: this won't work for Slackware <= 14.1):
@@ -200,7 +201,13 @@ SL_REPO_URL=${SL_REPO_URL:-"rsync.osuosl.org::slackware"}
 DEF_SL_REPO_URL=${SL_REPO_URL}
 
 # List of Slackware package series - each will become a squashfs module:
-SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
+if [ "$(echo ${SL_VERSION}|cut -d. -f1)" == "14" ]; then
+  # Slackware up and until 14.2 has KDE4 which includes the 'kdei' package set:
+  SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,kdei,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
+else
+  # Exclude Emacs to keep the ISO size below DVD size:
+  SEQ_SLACKWARE="tagfile:a,ap,d,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
+fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
 # - each series will become a squashfs module:
@@ -237,6 +244,7 @@ SEQ_STUDW="tagfile:a,ap,d,e,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra,sl
 # Package blacklists for variants:
 #BLACKLIST_DAW="seamonkey"
 #BLACKLIST_LEAN="seamonkey"
+BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars seamonkey"
 #BLACKLIST_XFCE="gst-plugins-bad-free lynx mc motif mozilla-firefox pidgin xlockmore"
 
 # Potentially we will use package(s) from 'testing' instead of regular repo:
@@ -482,6 +490,16 @@ function install_pkgs() {
       #   REP equal to PKG.
       # - If PKG is empty then this is a request to remove the package.
       REP=$(echo $PKGPAT |cut -d% -f1)
+      if [ "$CORE2RAM" != "NO" ] && [ -z "$(echo $CORE2RAMMODS |grep -w $(basename $PKGFILE .lst))" ]; then
+        # If we are adding core2ram modules,
+        # prevent re-installing their packages in another module:
+        PKGC2R="$(for MYLST in ${CORE2RAMMODS}; do grep "^${PKG}$" ${LIVE_TOOLDIR}/pkglists/${MYLST}.lst ; done)"
+        unset MYLST
+        if [ -n "${PKGC2R}" ]; then
+          # Found a package that is listed as a core2ram module:
+          continue
+        fi
+      fi
       # Skip installation on detecting a blacklisted package:
       for BLST in ${BLACKLIST} BLNONE; do
         if [ "$PKG" == "$BLST" ]; then
@@ -727,6 +745,7 @@ function gen_bootmenu() {
     -e "s/@VERSION@/$VERSION/g" \
     -e "s/@KAPPEND@/$KAPPEND/g" \
     -e "s/@C2RMH@/$C2RMH/g" \
+    -e "s/@C2RSH@/$C2RMS/g" \
     > ${MENUROOTDIR}/vesamenu.cfg
 
   for LANCOD in $(cat ${LIVE_TOOLDIR}/languages |grep -Ev "(^ *#|^$)" |cut -d: -f1)
@@ -772,6 +791,7 @@ EOL
       -e "s/@VERSION@/$VERSION/g" \
       -e "s/@KAPPEND@/$KAPPEND/g" \
       -e "s/@C2RMH@/$C2RMH/g" \
+      -e "s/@C2RMS@/$C2RMS/g" \
       > ${MENUROOTDIR}/menu_${LANCOD}.cfg
 
     # Generate custom language selection submenu for selected keyboard:
@@ -802,7 +822,7 @@ function gen_uefimenu() {
 
   GRUBDIR="$1"
 
-  # Generate the grub menu structure - many files because of the selection tree.
+  # Generate the grub menu structure.
   # I expect the directory to exist... but you never know.
   mkdir -p ${GRUBDIR}
 
@@ -832,12 +852,13 @@ function gen_uefimenu() {
     -e "s/@VERSION@/$VERSION/g" \
     -e "s/@KAPPEND@/$KAPPEND/g" \
     -e "s/@C2RMH@/$C2RMH/g" \
+    -e "s/@C2RMS@/$C2RMS/g" \
     > ${GRUBDIR}/grub.cfg
 
   # Set a default keyboard selection:
   cat <<EOL > ${GRUBDIR}/kbd.cfg
 # Keyboard selection:
-set default = $sl_lang
+set default = $sl_kbd
 
 EOL
 
@@ -883,6 +904,9 @@ EOL
   done
 
   # Create the timezone selection menu:
+  # Code used from Slackware script:
+  # source/a/glibc-zoneinfo/timezone-scripts/output-updated-timeconfig.sh
+  # Author: Patrick Volkerding <volkerdi@slackware.com>
   TZDIR="/usr/share/zoneinfo"
   TZLIST=$(mktemp -t alientz.XXXXXX)
   if [ ! -f $TZLIST ]; then
@@ -890,35 +914,46 @@ EOL
     cleanup
     exit 1
   fi
-  # First, create a list of timezones:
-  # This code taken from Slackware script:
-  # source/a/glibc-zoneinfo/timezone-scripts/output-updated-timeconfig.sh
-  # Author: Patrick Volkerding <volkerdi@slackware.com>
-  # US/ first:
-  ( cd $TZDIR
-    find . -type f | xargs file | grep "timezone data" | cut -f 1 -d : | cut -f 2- -d / | sort | grep "^US/" | while read zone ; do
-      echo "${zone}" >> $TZLIST
-    done
-  )
-  # Don't list right/ and posix/ zones:
-  ( cd $TZDIR
-    find . -type f | xargs file | grep "timezone data" | cut -f 1 -d : | cut -f 2- -d / | sort | grep -v "^US/" | grep -v "^posix/" | grep -v "^right/" | while read zone ; do
-      echo "${zone}" >> $TZLIST
-    done
-  )
-  for TZ in $(cat $TZLIST); do
-    # Add this entry to the keyboard selection menu:
+
+  # Structured tz select instead of dumping them all in one menu:
+  for TZ in US Africa America Asia Atlantic Australia Etc Europe Pacific; do
+    # First the submenu for this zone:
     cat <<EOL >> ${GRUBDIR}/tz.cfg
-menuentry "${TZ}" {
-  set sl_tz="$TZ"
+submenu "${TZ} >" {
+  configfile \$prefix/${TZ}/tz.cfg
+}
+
+EOL
+    # Then the locations for this zone:
+    mkdir ${GRUBDIR}/${TZ}
+    ( cd $TZDIR/$TZ
+      find . -type f | xargs file | grep "timezone data" | cut -f 1 -d : | cut -f2- -d / | sort | while read LOCN ; do
+        # Add this entry to the keyboard selection menu:
+        cat <<EOL >> ${GRUBDIR}/${TZ}/tz.cfg
+menuentry "${TZ}/${LOCN}" {
+  set sl_tz="${TZ}/${LOCN}"
   export sl_tz
   configfile \$prefix/grub.cfg
 }
 
 EOL
-  rm -f $TZLIST
-
+      done
+    )
   done
+  # Timezone data in rootdirectory follows:
+  ( cd $TZDIR
+    find . -type f -mindepth 1 -maxdepth 1 | xargs file | grep "timezone data" | cut -f 1 -d : | cut -f 2- -d / | sort | while read ZONE ; do
+      # Add this entry to the keyboard selection menu:
+      cat <<EOL >> ${GRUBDIR}/tz.cfg
+menuentry "${ZONE}" {
+  set sl_tz="$ZONE"
+  export sl_tz
+  configfile \$prefix/grub.cfg
+}
+
+EOL
+    done
+  )
 
 } # End of gen_uefimenu()
 
@@ -1407,20 +1442,17 @@ case "$LIVEDE" in
              ;;
 esac
 
-if [ "${CORE2RAM}" == "YES" ] || [ "${LIVEDE}" == "XFCE" ] || [ "${LIVEDE}" == "LEAN" ] || [ "${LIVEDE}" == "DAW" ] ; then
-  # For now, allow CORE2RAM only for the variants that actually
-  # have the required modules in their system list.
-  # TODO: create these modules separately in the 'core2ram' subdirectory. 
-  for MY_MOD in ${CORE2RAMMODS} ; do
-    if ! echo ${MSEQ} | grep -wq ${MY_MOD} ; then
-      echo ">> Modules required for Core RAM-based OS (${CORE2RAMMODS}) not available."
-      exit 1
-    fi
-  done
-  # Whether to hide the Core OS menu on boot yes or no:
-  C2RMH="#"
+if [ "${MSEQ#pkglist:${CORE2RAMMODS/ /,}}" != "${MSEQ}" ]; then
+  # This live ISO contains core2ram modules out of the box:
+  CORE2RAM="NATIVE"
+fi
+if [ "${CORE2RAM}" != "NO" ]; then
+  # Whether to show the Core OS menu in syslinux/grub on boot yes/no:
+  C2RMH="#"    # syslinux
+  C2RMS=""     # grub
 else
-  C2RMH=""
+  C2RMH=""     # syslinux
+  C2RMS="#"    # grub
 fi
 
 if ! cat ${LIVE_TOOLDIR}/languages |grep -Ev '(^ *#|^$)' |grep -q ^${DEF_LANG}:
@@ -1589,6 +1621,12 @@ RODIRS="${LIVE_BOOT}"
 # Create the verification file for the install_pkgs function:
 echo "${THEDATE} (${BUILDER})" > ${LIVE_BOOT}/${MARKER}
 
+# Do we need to add core2ram modules:
+if [ "$CORE2RAM" == "YES" ]; then
+  echo "-- Adding core2ram."
+  MSEQ="pkglist:${CORE2RAMMODS/ /,} ${MSEQ}"
+fi
+
 # Do we need to include secureboot module?
 if [ $SECUREBOOT -eq 1 ]; then
   echo "-- Adding secureboot module."
@@ -1628,6 +1666,10 @@ for MSUBSEQ in ${MSEQ} ; do
       local) MNUM="0030" ;;
           *) echo "** Unknown package source '$MTYPE'"; exit 1 ;;
   esac
+  # For an explicitly added core2ram module, re-assign a lower prefix:
+  if [ "$CORE2RAM" == "YES" ] && [ "${SL_SERIES}" == "${CORE2RAMMODS}" ]; then
+    MNUM="0005"
+  fi
 
 for SPS in ${SL_SERIES} ; do
 
@@ -1652,7 +1694,7 @@ for SPS in ${SL_SERIES} ; do
     install_pkgs ${SPS} ${LIVE_ROOTDIR} ${MTYPE}
     umount ${LIVE_ROOTDIR} || true
 
-    if [ "$SPS" = "a" -o "$SPS" = "${MINLIST}" ]; then
+    if [ "$SPS" = "a" -a "$CORE2RAM" = "NO" ] || [ "$SPS" = "${MINLIST}" ]; then
 
       # We need to take care of a few things first:
       if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
@@ -1761,7 +1803,7 @@ echo "LANG=${DEF_LOCALE}" > ${LIVE_ROOTDIR}/etc/locale.conf
 echo "KEYMAP=${DEF_KBD}" > ${LIVE_ROOTDIR}/etc/vconsole.conf
 
 # Set timezone to UTC, mimicking the 'timeconfig' script in Slackware:
-ln -s /usr/share/zoneinfo/UTC ${LIVE_ROOTDIR}/etc/localtime
+ln -sf /usr/share/zoneinfo/UTC ${LIVE_ROOTDIR}/etc/localtime
 # Could be absent so 'rm -f' to avoid script aborts:
 rm -f ${LIVE_ROOTDIR}/etc/localtime-copied-from
 
@@ -2056,7 +2098,7 @@ WGETOPTS="--timeout=20 --tries=2"
 GREYLIST=on
 PKGS_PRIORITY=( restricted alienbob ktown mate )
 REPOPLUS=( slackpkgplus restricted alienbob ktown mate )
-MIRRORPLUS['slackpkgplus']=http://slakfinder.org/slackpkg+/
+MIRRORPLUS['slackpkgplus']=https://slackware.nl/slackpkgplus/
 MIRRORPLUS['restricted']=http://slackware.nl/people/alien/restricted_sbrepos/${SL_VERSION}/${SL_ARCH}/
 MIRRORPLUS['alienbob']=http://slackware.nl/people/alien/sbrepos/${SL_VERSION}/${SL_ARCH}/
 MIRRORPLUS['mate']=http://slackware.uk/msb/${SL_VERSION}/latest/${SL_ARCH}/ 
@@ -2551,6 +2593,12 @@ if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/kf5 ]; then
 
   # Set the OS name to "Slackware Live" in "System Information":
   echo "Name=${DISTRO^} Live" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  # Use os-release's VERSION (default=false means: use VERSION_ID)
+  echo "UseOSReleaseVersion=true" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  if [ "${SL_VERSION}" = "current" ]; then
+    # Some more detail on development release:
+    echo "Variant=Post-stable development (-current)" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  fi
 
   # Set sane SDDM defaults on first boot (root-owned file):
   mkdir -p ${LIVE_ROOTDIR}/var/lib/sddm

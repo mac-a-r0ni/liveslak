@@ -125,6 +125,10 @@ toram => copy the OS from the media to to RAM before running it.
 toram=all => Prevent writes to disk since we are supposed to
   run from RAM; equivalent to parameter "toram".
 
+toram=core => Load Console OS modules into RAM. Console-only Slackware
+  loads fast, contains 'setup2hd' and frees up your USB drive so you can
+  overwrite it with a Persistent Live OS.
+
 toram=os => Load OS modules into RAM, but write persistent data to USB.
 
 === Troubleshooting ===

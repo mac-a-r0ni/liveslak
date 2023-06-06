@@ -36,6 +36,11 @@ xlogin.Login.y:			LOGIN_POS_Y
 xlogin.Login.borderWidth:	0
 xlogin.Login.foreground:	#ffe4e4
 xlogin.Login.background:	black
+xlogin.Login.hiColor:		black
+xlogin.Login.shdColor:		black
+xlogin.Login.inpColor:		black
+xlogin.Login.innerFramesWidth:	0
+xlogin.Login.sepWidth:		0
 xlogin.Login.logoFileName:	/etc/X11/xdm/liveslak-xdm/bluepiSW.xpm
 
 .XClock.geometry:		350x28+0-0

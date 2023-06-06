@@ -1,7 +1,7 @@
 #
 # Libraries and programs to support a basic Plasma5 installation:
 #
-Imath
+#Imath
 #LibRaw
 PyQt5
 QScintilla
@@ -78,7 +78,7 @@ libpinyin
 libqalculate
 libraw1394
 libsass
-libseccomp
+#libseccomp
 libspectre
 liburing
 libva-utils
@@ -110,12 +110,12 @@ python-PyYAML
 python-doxypypy
 python-doxyqml
 qca
-qrencode
+#qrencode
 qt5
 qt5-webkit
 qtkeychain
 rttr
-ruby
+#ruby
 rxvt
 # xapbase:
 #rxvt-unicode
@@ -131,7 +131,7 @@ taglib-extras
 # x_base:
 #vim
 #vim-gvim
-vulkan-sdk
+#vulkan-sdk
 woff2
 xcb-util-cursor
 xcb-util-errors

@@ -3,12 +3,17 @@ glibc
 libmpc
 mpfr
 # noxbase.lst:
+autoconf
+automake
 bison
 flex
 gcc
 gccmakedep
+gettext
 guile
 intltool
+libtool
+m4
 make
 # z00_plasma5supp.lst:
 gcc-g++

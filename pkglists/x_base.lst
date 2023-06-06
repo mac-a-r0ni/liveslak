@@ -1,5 +1,6 @@
 ConsoleKit2
 GConf
+Imath
 Mako
 SDL2
 SDL2_gfx
@@ -213,6 +214,7 @@ pygobject3
 pygtk
 python-MarkupSafe
 python-distro
+qrencode
 randrproto
 recordproto
 rendercheck
@@ -241,6 +243,7 @@ ttf-indic-fonts
 videoproto
 viewres
 vte
+vulkan-sdk
 wayland
 wqy-zenhei-font-ttf
 x11-skel

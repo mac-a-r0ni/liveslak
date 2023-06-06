@@ -2,7 +2,7 @@
 #
 # Copyright 2004  Slackware Linux, Inc., Concord, CA, USA
 # Copyright 2007, 2008, 2009, 2010, 2012  Patrick J. Volkerding, Sebeka, MN, USA
-# Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022  Eric Hameleers, Eindhoven, NL
+# Copyright 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL
 # All rights reserved.
 #
 # Redistribution and use of this script, with or without modification, is
@@ -195,7 +195,7 @@ for ARG in $(cat /proc/cmdline); do
       # generic syntax: hostname=newname[,qualifier]
       LIVE_HOSTNAME=$(echo $ARG | cut -f2 -d= | cut -f1 -d,)
       # Allow for the user to (mistakenly) add a domain component:
-      if [ $(echo $LIVE_HOSTNAME |cut -d. -f1- --output-delimiter ' '|wc -w) -gt 1 ]; then
+      if [ -n "$(echo "$LIVE_HOSTNAME". |cut -d. -f2-)" ]; then
         LIVE_DOMAIN=$(echo $LIVE_HOSTNAME |cut -d. -f2-)
         LIVE_HOSTNAME=$(echo $LIVE_HOSTNAME |cut -d. -f1)
       fi
@@ -646,7 +646,12 @@ if [ "$RESCUE" = "" ]; then
     SUBSYS="$1"
 
     # Find all supported modules:
-    for MODULE in $(find_mod /mnt/media/${LIVEMAIN}/${SUBSYS}/) $(find_mod ${SUPERMNT}/${LIVESLAKROOT}/${LIVEMAIN}/${SUBSYS}/) ; do
+    SUBSYSSET="$(find_mod /mnt/media/${LIVEMAIN}/${SUBSYS}/) $(find_mod ${SUPERMNT}/${LIVESLAKROOT}/${LIVEMAIN}/${SUBSYS}/)"
+    if [ "$SUBSYS" = "optional" ]; then
+      # We need to load any core2ram modules first:
+      SUBSYSSET="$(find_mod /mnt/media/${LIVEMAIN}/core2ram/) $(find_mod ${SUPERMNT}/${LIVESLAKROOT}/${LIVEMAIN}/core2ram/ ${SUBSYSSET})"
+    fi
+    for MODULE in ${SUBSYSSET} ; do
       # Strip path and extension from the modulename:
       MODBASE="$(mod_base ${MODULE})"
       if [ "$SUBSYS" = "optional" ]; then
@@ -823,8 +828,15 @@ if [ "$RESCUE" = "" ]; then
     # Detect Ventoy in memory (don't use the provided hooks), see
     # https://www.ventoy.net/en/doc_compatible_format.html:
     dd if=/dev/mem of=/vent.dmp bs=1 skip=$((0x80000)) count=$((0xA0000-0x80000)) 2>/dev/null
+    # Use 'strings' to find the decimal offset of the magic string;
     # With 'xargs' we remove leading and ending spaces:
-    OFFSET=$(strings -t d /vent.dmp |grep '  www.ventoy.net' |xargs |cut -d' ' -f1)
+    if strings -t d /vent.dmp 1>/dev/null 2>/dev/null ; then
+      # Busybox in Slackware 15.0 or newer:
+      OFFSET=$(strings -t d /vent.dmp |grep '  www.ventoy.net' |xargs |cut -d' ' -f1)
+    else
+      # Busybox in Slackware 14.2 or older:
+      OFFSET=$(strings -o /vent.dmp |grep '  www.ventoy.net' |xargs |cut -d' ' -f1)
+    fi
     if [ -n "${OFFSET}" ]; then
       echo "${MARKER}:  (BIOS) Ventoy ISO boot detected..."
       ISOBOOT="ventoy"
@@ -1083,7 +1095,7 @@ if [ "$RESCUE" = "" ]; then
 
   # Load a custom keyboard mapping:
   if [ -n "$KEYMAP" ]; then
-    echo "${MARKER}:  Loading '$KEYMAP' keyboard mapping:"
+    echo "${MARKER}:  Loading '$KEYMAP' keyboard mapping."
     tar xzOf /etc/keymaps.tar.gz ${KEYMAP}.bmap | loadkmap
   fi
 
