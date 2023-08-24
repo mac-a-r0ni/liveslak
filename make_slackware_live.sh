@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.7.0"
+VERSION="1.7.0.1"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -255,7 +255,7 @@ TESTINGLIST_DAW=""
 # List of kernel modules required for a live medium to boot properly;
 # Lots of HID modules added to support keyboard input for LUKS password entry;
 # Virtio modules added to experiment with liveslak in a VM.
-KMODS=${KMODS:-"squashfs:overlay:loop:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
+KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
 
 # Network kernel modules to include for NFS root support:
 NETMODS="kernel/drivers/net kernel/drivers/virtio"
@@ -2625,6 +2625,18 @@ EOT
 [super-user-command]
 super-user-command=sudo
 KDESU_EOF
+
+  # For the above to work in KDE5 with newer versions of sudo (since 2022),
+  # we need the following also. KDE5 fixed this in git on 04-aug-2023, see
+  # https://bugs.kde.org/show_bug.cgi?id=452532 but it does not hurt to have
+  # it here, and it helps to support older KDE releases:
+  if [ -x ${LIVE_ROOTDIR}/usr/lib*/libexec/kf5/kdesu_stub ]; then
+    mkdir -p ${LIVE_ROOTDIR}/etc/sudoers.d
+    chmod 750 ${LIVE_ROOTDIR}/etc/sudoers.d
+    cat <<KDESU_EOF2 >${LIVE_ROOTDIR}/etc/sudoers.d/kdesu
+Defaults!/usr/lib*/libexec/kf5/kdesu_stub !use_pty
+KDESU_EOF2
+  fi
 
   # Set akonadi backend:
   cat <<AKONADI_EOF >${LIVE_ROOTDIR}/etc/skel/.config/akonadi/akonadiserverrc

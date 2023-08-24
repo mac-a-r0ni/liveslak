@@ -168,6 +168,11 @@ if grep devtmpfs /proc/filesystems 1>/dev/null 2>/dev/null ; then
   mount -n devtmpfs /dev -t devtmpfs -o size=8M
 fi	
 
+# Mount if this directory exists (so the kernel supports efivarfs):
+if [ -d /sys/firmware/efi/efivars ]; then
+  mount -o rw -t efivarfs none /sys/firmware/efi/efivars
+fi
+
 # Parse command line
 for ARG in $(cat /proc/cmdline); do
   case $ARG in
@@ -818,16 +823,23 @@ if [ "$RESCUE" = "" ]; then
   VENTID="VentoyOsParam-77772020-2e77-6576-6e74-6f792e6e6574"
   VENTVAR="/sys/firmware/efi/vars/${VENTID}"
   if [ ! -d "${VENTVAR}" ]; then
+    # Newer Slackware will use 'efivars' rather than 'vars' directory;
     VENTVAR="/sys/firmware/efi/efivars/${VENTID}"
   fi
   if [ -d "${VENTVAR}" ]; then
     echo "${MARKER}:  (UEFI) Ventoy ISO boot detected..."
     ISOBOOT="ventoy"
     VENTOSPARM="${VENTVAR}/data"
+  elif [ -f "${VENTVAR}" ]; then
+    # Kernel >= 6.x does not offer a clean data sctructure, so we need to
+    # find the offset of the data block in the efivars file:
+    cat "${VENTVAR}" > /vent.dmp
   else
     # Detect Ventoy in memory (don't use the provided hooks), see
     # https://www.ventoy.net/en/doc_compatible_format.html:
     dd if=/dev/mem of=/vent.dmp bs=1 skip=$((0x80000)) count=$((0xA0000-0x80000)) 2>/dev/null
+  fi
+  if [ -f /vent.dmp ]; then
     # Use 'strings' to find the decimal offset of the magic string;
     # With 'xargs' we remove leading and ending spaces:
     if strings -t d /vent.dmp 1>/dev/null 2>/dev/null ; then
