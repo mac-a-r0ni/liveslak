@@ -32,10 +32,19 @@ FORCE=0
 # The default layout of the USB stick is:
 #   partition 1 (1MB),
 #   partition 2 (100 MB)
-#   partition 3 (claim all free space - specified as 0 MB).
+#   partition 3 (claim all free space - specified as -1 MB).
 # The script allows for an amount of free space to be left at the end
-# (partition 4, unused by liveslak) in case you need this:
+# (partition 4, un-used by liveslak) in case you need this:
 DEF_LAYOUT="1,100,-1,"
+
+# The extension for containerfiles accompanying an ISO is '.icc',
+# whereas the persistent USB stick created with iso2usb.sh uses '.img'.
+DEFEXT=".img"
+CNTEXT="${DEFEXT}"
+
+# Default filesystem for devices/containers:
+DEF_FS="ext4"
+FSYS="${DEF_FS}"
 
 # By default, we use 'slhome.img' as the name of the LUKS home containerfile.
 DEF_SLHOME="slhome"
@@ -97,9 +106,7 @@ else
 fi
 
 # Initialize more variables:
-CNTBASE=""
 CNTDEV=""
-CNTFILE=""
 HLUKSSIZE=""
 LUKSHOME=""
 LODEV=""
@@ -111,6 +118,11 @@ CNTMNT=""
 USBMNT=""
 US2MNT=""
 
+# Minimim free space (in MB) we want to have left in any partition
+# after we are done.
+# The default value can be changed from the environment:
+MINFREE=${MINFREE:-10}
+
 # Compressor used on the initrd ("gzip" or "xz --check=crc32");
 # Note that the kernel's XZ decompressor does not understand CRC64:
 COMPR="xz --check=crc32"
@@ -120,7 +132,7 @@ COMPR="xz --check=crc32"
 #
 
 # Clean up in case of failure:
-cleanup() {
+function cleanup() {
   # Clean up by unmounting our loopmounts, deleting tempfiles:
   echo "--- Cleaning up the staging area..."
   # During cleanup, do not abort due to non-zero exit code:
@@ -130,7 +142,7 @@ cleanup() {
     # In case of failure, only the most recent device should still be open:
     if mount |grep -q ${CNTDEV} ; then
       umount -f ${CNTDEV}
-      cryptsetup luksClose $(basename ${CNTBASE})
+      cryptsetup luksClose $(basename ${CNTDEV})
       losetup -d ${LODEV}
     fi
   fi
@@ -140,10 +152,10 @@ cleanup() {
   [ -n "${US2MNT}" ] && ( umount -f ${US2MNT} 2>/dev/null; rmdir $US2MNT 2>/dev/null )
   [ -n "${IMGDIR}" ] && ( rm -rf $IMGDIR )
   set -e
-}
+} # End of cleanup()
 trap 'echo "*** $0 FAILED at line $LINENO ***"; cleanup; exit 1' ERR INT TERM
 
-showhelp() {
+function showhelp() {
 cat <<EOT
 #
 # Purpose: to transfer the content of Slackware's Live ISO image
@@ -186,6 +198,12 @@ cat <<EOT
 #                              of a directory (for use on FAT filesystem)
 #                              Format for size/percentage is the same
 #                              as for the '-c' parameter.
+#   -F|--filesystem <fs>       Specify filesystem to create when formatting
+#                              devices/containers. Defaults to '${DEF_FS}',
+#                              Choices are $(createfs).
+#                              Note that the linux partition will always be
+#                              formatted as 'ext4' because extlinux is used
+#                              as the BIOS bootloader.
 #   -P|--persistfile           Use a 'persistence' container file instead of
 #                              a directory (for use on FAT filesystem).
 #                              Persistent data will not be migrated
@@ -198,30 +216,76 @@ cat <<EOT
 # $(basename $0) -i slackware-live-current.iso -o /dev/sdX -y 1,200,-1,4096
 #
 EOT
-}
+} # End of showhelp()
+
+# Create a filesystem on a partition with optional label:
+function createfs () {
+  MYDEV="${1}"
+  MYFS="${2:-'ext4'}"
+  MYLABEL="${3}"
+
+  if [ -z "${MYDEV}" ]; then
+    # Without arguments given, reply with list of supported fs'es:
+    echo  "btrfs,ext2,ext4,f2fs,jfs,xfs"
+    return
+  fi
+
+  if [ -n "${MYLABEL}" ]; then
+    case "${MYFS}" in
+    fs2s) MYLABEL="-l ${MYLABEL}" ;;
+    *)    MYLABEL="-L ${MYLABEL}" ;;
+    esac
+  fi
+
+  case "${MYFS}" in
+    btrfs) mkfs.btrfs -f -d single -m single ${MYLABEL} ${MYDEV}
+           ;;
+    ext2)  mkfs.ext2 -F -F ${MYLABEL} ${MYDEV}
+           # Tune the ext2 filesystem:
+           tune2fs -m 0 -c 0 -i 0 ${MYDEV}
+           ;;
+    ext4)  mkfs.ext4 -F -F ${MYLABEL} ${MYDEV}
+           # Tune the ext4 filesystem:
+           tune2fs -m 0 -c 0 -i 0 ${MYDEV}
+           ;;
+    f2fs)  mkfs.f2fs ${MYLABEL} -f ${MYDEV}
+           ;;
+    jfs)   mkfs.jfs -q ${MYDEV}
+           ;;
+    xfs)   mkfs.xfs -f ${MYDEV}
+           ;;
+    *)     echo "*** Unsupported filesystem '${MYFS}'!"; exit 1
+           ;;
+  esac
+} # End of createfs()
 
 # Uncompress the initrd based on the compression algorithm used:
-uncompressfs () {
-  if $(file "${1}" | grep -qi ": gzip"); then
-    gzip -cd "${1}"
-  elif $(file "${1}" | grep -qi ": XZ"); then
-    xz -cd "${1}"
-  elif $(file "${1}" | grep -qi ": lzip"); then
-    lzip -cd "${1}"
+function uncompressfs () {
+  local IMGFILE="$1"
+  # Content is streamed to STDOUT:
+  if $(file "${IMGFILE}" | grep -qi ": gzip"); then
+    gzip -cd "${IMGFILE}"
+  elif $(file "${IMGFILE}" | grep -qi ": XZ"); then
+    xz -cd "${IMGFILE}"
+  elif $(file "${IMGFILE}" | grep -qi ": LZMA"); then
+    lzma -cd "${IMGFILE}"
+  elif $(file "${IMGFILE}" | grep -qi ": lzip"); then
+    lzip -cd "${IMGFILE}"
   fi
-}
+} # End of uncompressfs()
 
 # Scan for insertion of a USB device:
-scan_devices() {
+function scan_devices() {
+  local MYSCANWAIT="${1}"
   local BD
   # Inotifywatch does not trigger on symlink creation,
   # so we can not watch /sys/block/
-  BD=$(inotifywait -q -t ${SCANWAIT} -e create /dev 2>/dev/null |cut -d' ' -f3)
+  BD=$(inotifywait -q -t ${MYSCANWAIT} -e create /dev 2>/dev/null |cut -d' ' -f3)
   echo ${BD}
 } # End of scan_devices()
 
 # Show a list of removable devices detected on this computer:
-show_devices() {
+function show_devices() {
   local MYDATA="${*}"
   if [ -z "${MYDATA}" ]; then
     MYDATA="$(ls --indicator-style=none /sys/block/ |grep -Ev '(ram|loop|dm-)')"
@@ -237,16 +301,16 @@ show_devices() {
 } # End of show_devices()
 
 # Read configuration data from old initrd:
-read_initrd() {
+function read_initrd() {
   IMGFILE="$1"
 
   OLDPERSISTENCE=$(uncompressfs ${IMGFILE} |cpio -i --to-stdout init |grep "^PERSISTENCE" |cut -d '"' -f2 2>/dev/null)
   OLDWAIT=$(uncompressfs ${IMGFILE} |cpio -i --to-stdout wait-for-root 2>/dev/null)
   OLDLUKS=$(uncompressfs ${IMGFILE} |cpio -i --to-stdout luksdev 2>/dev/null)
-}
+} # End of read_initrd()
 
 # Add longer USB WAIT to the initrd:
-update_initrd() {
+function update_initrd() {
   IMGFILE="$1"
 
   # USB boot medium needs a few seconds boot delay else the overlay will fail.
@@ -314,93 +378,133 @@ update_initrd() {
   rm -rf $IMGDIR/*
 } # End of update_initrd()
 
+# Determine size of a mounted partition (in MB):
+function get_part_mb_size() {
+  local MYPART="${1}"
+  local MYSIZE
+  MYSIZE=$(df -P -BM ${MYPART} |tail -n -1 |tr -s '\t' ' ' |cut -d' ' -f2)
+  echo "${MYSIZE%M}"
+} # End of get_part_mb_size()
+
+# Determine free space of a mounted partition (in MB):
+function get_part_mb_free() {
+  local MYPART="${1}"
+  local MYSIZE
+  MYSIZE=$(df -P -BM ${MYPART} |tail -n -1 |tr -s '\t' ' ' |cut -d' ' -f4)
+  echo "${MYSIZE%M}"
+} # End of get_part_mb_free()
+
+# Determine requested container size in MB (allow for '%|k|K|m|M|g|G' suffix):
+function cont_mb() {
+  # Uses global variables: PARTFREE
+  local MYSIZE="$1"
+  case "${MYSIZE: -1}" in
+     "%") MYSIZE="$(( $PARTFREE * ${MYSIZE%\%} / 100 ))" ;;
+     "k") MYSIZE="$(( ${MYSIZE%k} / 1024 ))" ;;
+     "K") MYSIZE="$(( ${MYSIZE%K} / 1024 ))" ;;
+     "m") MYSIZE="${MYSIZE%m}" ;;
+     "M") MYSIZE="${MYSIZE%M}" ;;
+     "g") MYSIZE="$(( ${MYSIZE%g} * 1024 ))" ;;
+     "G") MYSIZE="$(( ${MYSIZE%G} * 1024 ))" ;;
+       *) MYSIZE=-1 ;;
+  esac
+  echo "$MYSIZE"
+} # End of cont_mb()
+
 # Create a container file in the empty space of the partition
-create_container() {
-  CNTPART=$1
-  CNTSIZE=$2
-  CNTBASE=$3
-  CNTENCR=$4 # 'none' or 'luks'
-  CNTUSED=$5 # '/home' or 'persistence'
+function create_container() {
+  local CNTPART=$1 # partition containing the ISO
+  local CNTSIZE=$2 # size of the container file to create
+  local CNTFILE=$3 # ${CNTEXT} filename with full path
+  local CNTENCR=$4 # 'none' or 'luks'
+  local CNTUSED=$5 # '/home' or 'persistence'
+  local MYMAP
+  local MYMNT
+
+  # If containerfile extension is missing, add it now:
+  if [ "${CNTFILE%${CNTEXT}}" == "${CNTFILE}" ]; then
+    CNTFILE="${CNTFILE}${CNTEXT}"
+  fi
 
   # Create a container file or re-use previously created one:
-  if [ -f $USBMNT/${CNTBASE}.img ]; then
-    CNTFILE="${CNTBASE}.img"
-    CNTSIZE=$(( $(du -sk $USBMNT/${CNTFILE} |tr '\t' ' ' |cut -f1 -d' ') / 1024 ))
-    echo "--- Keeping existing '${CNTFILE}' (size ${CNTSIZE} MB)."
+  if [ -f ${CNTFILE} ]; then
+    # Where are we mounted?
+    MYMNT=$(cd "$(dirname "${CNTFILE}")" ; df --output=target . |tail -1)
+    CNTSIZE=$(( $(du -sk ${CNTFILE} |tr '\t' ' ' |cut -f1 -d' ') / 1024 ))
+    echo "--- Keeping existing '${CNTFILE#${MYMNT}}' (size ${CNTSIZE} MB)."
     return
   fi
 
   # Determine size of the target partition (in MB), and the free space:
-  PARTSIZE=$(df -P -BM ${CNTPART} |tail -1 |tr -s '\t' ' ' |cut -d' ' -f2)
-  PARTSIZE=${PARTSIZE%M}
-  PARTFREE=$(df -P -BM ${CNTPART} |tail -1 |tr -s '\t' ' ' |cut -d' ' -f4)
-  PARTFREE=${PARTFREE%M}
+  PARTSIZE=$(get_part_mb_size ${CNTPART})
+  PARTFREE=$(get_part_mb_free ${CNTPART})
 
-  if [ $PARTFREE -lt 10 ]; then
-    echo "*** Free space on USB partition is less than 10 MB;"
+  if [ $PARTFREE -lt ${MINFREE} ]; then
+    echo "*** Free space on USB partition is less than ${MINFREE} MB;"
     echo "*** Not creating a container file!"
+    cleanup
     exit 1
   fi
 
-  # Determine requested container size (allow for '%|k|K|m|M|g|G' suffix):
-  case "${CNTSIZE: -1}" in
-     "%") CNTSIZE="$(( $PARTFREE * ${CNTSIZE%\%} / 100 ))" ;;
-     "k") CNTSIZE="$(( ${CNTSIZE%k} / 1024 ))" ;;
-     "K") CNTSIZE="$(( ${CNTSIZE%K} / 1024 ))" ;;
-     "m") CNTSIZE="${CNTSIZE%m}" ;;
-     "M") CNTSIZE="${CNTSIZE%M}" ;;
-     "g") CNTSIZE="$(( ${CNTSIZE%g} * 1024 ))" ;;
-     "G") CNTSIZE="$(( ${CNTSIZE%G} * 1024 ))" ;;
-       *) ;;
-  esac
+  # Determine requested container size in MB (allow for '%|k|K|m|M|g|G' suffix):
+  CNTSIZE=$(cont_mb ${CNTSIZE})
 
   if [ $CNTSIZE -le 0 ]; then
     echo "*** Container size must be larger than ZERO!"
     echo "*** Check your '-c' commandline parameter."
+    cleanup
     exit 1
   elif [ $CNTSIZE -ge $PARTFREE ]; then
     echo "*** Not enough free space for container file!"
     echo "*** Check your '-c' commandline parameter."
+    cleanup
     exit 1
   fi
 
   echo "--- Creating ${CNTSIZE} MB container file using 'dd if=/dev/urandom', patience please..."
-  mkdir -p $USBMNT/$(dirname "${CNTBASE}")
-  CNTFILE="${CNTBASE}.img"
-  # Create a sparse file (not allocating any space yet):
-  dd of=$USBMNT/${CNTFILE} bs=1M count=0 seek=$CNTSIZE
+  mkdir -p $(dirname "${CNTFILE}")
+  if [ $? ]; then
+    # Create a sparse file (not allocating any space yet):
+    dd of=${CNTFILE} bs=1M count=0 seek=$CNTSIZE 2>/dev/null
+  else
+    echo "*** Failed to create directory for the container file!"
+    cleanup
+    exit 1
+  fi
 
   # Setup a loopback device that we can use with cryptsetup:
   LODEV=$(losetup -f)
-  losetup $LODEV $USBMNT/${CNTFILE}
+  losetup $LODEV ${CNTFILE}
+  MYMAP=$(basename ${CNTFILE} ${CNTEXT})
   if [ "${CNTENCR}" = "luks" ]; then
     # Format the loop device with LUKS:
-    echo "--- Encrypting the container file with LUKS; enter 'YES' and a passphrase..."
+    echo "--- Encrypting the container file with LUKS via '${LODEV}'"
+    echo "--- This takes SOME time, please be patient..."
+    echo "--- enter 'YES' and a passphrase:"
     until cryptsetup -y luksFormat $LODEV ; do
       echo ">>> Did you type two different passphrases?"
       read -p ">>> Press [ENTER] to try again or Ctrl-C to abort ..." REPLY 
     done
     # Unlock the LUKS encrypted container:
     echo "--- Unlocking the LUKS container requires your passphrase again..."
-    until cryptsetup luksOpen $LODEV $(basename ${CNTBASE}) ; do
+    until cryptsetup luksOpen $LODEV ${MYMAP} ; do
       echo ">>> Did you type an incorrect passphrases?"
       read -p ">>> Press [ENTER] to try again or Ctrl-C to abort ..." REPLY 
     done
-    CNTDEV=/dev/mapper/$(basename ${CNTBASE})
+    CNTDEV=/dev/mapper/${MYMAP}
     # Now we allocate blocks for the LUKS device. We write encrypted zeroes,
     # so that the file looks randomly filled from the outside.
     # Take care not to write more bytes than the internal size of the container:
+    echo "--- Writing ${CNTSIZE} MB of random data to encrypted container; takes LONG time..."
     CNTIS=$(( $(lsblk -b -n -o SIZE  $(readlink -f ${CNTDEV})) / 512))
-    dd if=/dev/zero of=${CNTDEV} bs=512 count=${CNTIS} || true
+    dd if=/dev/zero of=${CNTDEV} bs=512 count=${CNTIS} status=progress || true
   else
-    CNTDEV=$LODEV
     # Un-encrypted container files remain sparse.
+    CNTDEV=$LODEV
   fi
 
   # Format the now available block device with a linux fs:
-  mkfs.ext4 ${CNTDEV}
-  # Tune the ext4 filesystem:
-  tune2fs -m 0 -c 0 -i 0 ${CNTDEV}
+  createfs ${CNTDEV} ${FSYS}
 
   if [ "${CNTUSED}" != "persistence" ]; then
     # Create a mount point for the unlocked container:
@@ -414,7 +518,7 @@ create_container() {
     fi
     # Copy the original /home (or whatever mount) content into the container:
     echo "--- Copying '${CNTUSED}' from LiveOS to container..."
-    HOMESRC=$(find ${USBMNT} -name "0099-slackware_zzzconf*" |tail -1)
+    HOMESRC=$(find ${ISOMNT} -name "0099-slackware_zzzconf*" |tail -1)
     mount ${CNTDEV} ${CNTMNT}
     unsquashfs -n -d ${CNTMNT}/temp ${HOMESRC} ${CNTUSED}
     mv ${CNTMNT}/temp/${CNTUSED}/* ${CNTMNT}/
@@ -424,10 +528,9 @@ create_container() {
 
   # Don't forget to clean up after ourselves:
   if [ "${CNTENCR}" = "luks" ]; then
-    cryptsetup luksClose $(basename ${CNTBASE})
+    cryptsetup luksClose ${MYMAP}
   fi
   losetup -d ${LODEV} || true
-
 } # End of create_container() {
 
 #
@@ -506,6 +609,10 @@ while [ ! -z "$1" ]; do
       PERSISTTYPE="file"
       shift 2
       ;;
+    -F|--filesystem)
+      FSYS="$2"
+      shift 2
+      ;;
     -P|--persistfile)
       PERSISTTYPE="file"
       shift
@@ -533,7 +640,7 @@ fi
 if [ -z "$TARGET" ]; then
   if [ $SCAN -eq 1 ]; then
     echo "-- Waiting  ${SCANWAIT} seconds for a USB stick to be inserted..."
-    TARGET=$(scan_devices)
+    TARGET=$(scan_devices ${SCANWAIT})
     if [ -z "$TARGET" ]; then
       echo "*** No new USB device detected during $SCANWAIT seconds scan."
       exit 1
@@ -554,6 +661,16 @@ if [ $FORCE -eq 0 -a ! -f "$SLISO" ]; then
   exit 1
 fi
 
+if [ "${HLUKSSIZE%.*}" != "${HLUKSSIZE}" ] ; then
+  echo "*** Integer value required in '-c $HLUKSSIZE' !"
+  exit 1
+fi
+
+if [ "${PLUKSSIZE%.*}" != "${PLUKSSIZE}" ] ; then
+  echo "*** Integer value required in '-C $PLUKSSIZE' !"
+  exit 1
+fi
+
 if [ $FORCE -eq 0 ]; then
   if [ ! -e /sys/block/$(basename $TARGET) ]; then
     echo "*** Not a block device: '$TARGET' !"
@@ -565,6 +682,9 @@ if [ $FORCE -eq 0 ]; then
     exit 1
   fi
 fi
+
+# Add required filesystem tools:
+REQTOOLS="${REQTOOLS} mkfs.${FSYS}"
 
 # Are all the required not-so-common add-on tools present?
 PROG_MISSING=""
@@ -710,14 +830,15 @@ if [ $REFRESH -eq 0 ]; then
   if mount |grep -qw ${TARGETP3} ; then
     umount ${TARGETP3} || true
   fi
+  # We use extlinux to boot the stick, so other filesystems are not accepted:
+  createfs ${TARGETP3} ext4 "${LIVELABEL}"
   # http://www.syslinux.org/wiki/index.php?title=Filesystem
-  # As of Syslinux 6.03, "pure 64-bits" compression/encryption is not supported.
+  # As of Syslinux 6.03, "pure 64-bits" compression/encryption is unsupported.
   # Modern mke2fs creates file systems with the metadata_csum and 64bit
   # features enabled by default.
   # Explicitly disable 64bit feature in the mke2fs command with '-O ^64bit';
   # otherwise, the syslinux bootloader (>= 6.03) will fail.
   # Note: older 32bit OS-es will trip over the '^64bit' feature so be gentle.
-  mkfs.ext4 -F -F -L "${LIVELABEL}" ${TARGETP3}
   UNWANTED_FEAT=""
   if tune2fs -O ^64bit ${TARGETP3} 1>/dev/null 2>/dev/null ; then
     UNWANTED_FEAT="^64bit,"
@@ -829,9 +950,13 @@ if [ -n "$VERSION" ]; then
 fi
 
 if [ -n "${HLUKSSIZE}" ]; then
-  # Create LUKS container file for /home:
-  create_container ${TARGETP3} ${HLUKSSIZE} ${SLHOME} luks /home
-  LUKSHOME=${CNTFILE}
+  # If file extension is missing in the containername, add it now:
+  if [ "${SLHOME%${CNTEXT}}" == "${SLHOME}" ]; then
+    SLHOME="${SLHOME}${CNTEXT}"
+  fi
+  # Create LUKS container file for /home ;
+  LUKSHOME="${SLHOME}"
+  create_container ${TARGETP3} ${HLUKSSIZE} "${USBMNT}/${LUKSHOME}" luks /home
 fi
 
 # Update the initrd with regard to USB wait time, persistence and LUKS.
@@ -847,15 +972,15 @@ if [ $REFRESH -eq 1 ]; then
     # The user specified a nonstandard persistence, so move the old one first;
     # hide any errors if it did not *yet* exist:
     mkdir -p ${USBMNT}/$(dirname ${PERSISTENCE})
-    mv ${USBMNT}/${OLDPERSISTENCE}.img ${USBMNT}/${PERSISTENCE}.img 2>/dev/null
+    mv ${USBMNT}/${OLDPERSISTENCE}${CNTEXT} ${USBMNT}/${PERSISTENCE}${CNTEXT} 2>/dev/null
     mv ${USBMNT}/${OLDPERSISTENCE} ${USBMNT}/${PERSISTENCE} 2>/dev/null
   fi
-  if [ -f ${USBMNT}/${PERSISTENCE}.img ]; then
+  if [ -f ${USBMNT}/${PERSISTENCE}${CNTEXT} ]; then
     # If a persistence container exists, we re-use it:
     PERSISTTYPE="file"
-    if cryptsetup isLuks ${USBMNT}/${PERSISTENCE}.img ; then
+    if cryptsetup isLuks ${USBMNT}/${PERSISTENCE}${CNTEXT} ; then
       # If the persistence file is LUKS encrypted we need to record its size:
-      PLUKSSIZE=$(( $(du -sk $USBMNT/${PERSISTENCE}.img |tr '\t' ' ' |cut -f1 -d' ') / 1024 ))
+      PLUKSSIZE=$(( $(du -sk $USBMNT/${PERSISTENCE}${CNTEXT} |tr '\t' ' ' |cut -f1 -d' ') / 1024 ))
     fi
   elif [ -d ${USBMNT}/${PERSISTENCE} -a "${PERSISTTYPE}" = "file" ]; then
     # A persistence directory exists but the user wants a container now;
@@ -876,10 +1001,10 @@ elif [ "${PERSISTTYPE}" = "file" ]; then
   # Note: the word "persistence" below is a keyword for create_container:
   if [ -z "${PLUKSSIZE}" ]; then
     # Un-encrypted container:
-    create_container ${TARGETP3} 90% ${PERSISTENCE} none persistence
+    create_container ${TARGETP3} 90% ${USBMNT}/${PERSISTENCE} none persistence
   else
     # LUKS-encrypted container:
-    create_container ${TARGETP3} ${PLUKSSIZE} ${PERSISTENCE} luks persistence
+    create_container ${TARGETP3} ${PLUKSSIZE} ${USBMNT}/${PERSISTENCE} luks persistence
   fi
 else
   echo "*** Unknown persistence type '${PERSISTTYPE}'!"

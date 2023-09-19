@@ -28,6 +28,7 @@ libcue
 libgnt
 libnice
 libnma
+libptytty
 libsigc++
 libsigc++3
 libsodium

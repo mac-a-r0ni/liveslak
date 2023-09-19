@@ -31,6 +31,8 @@ fi
 # Determine whether we can show a graphical themed menu:
 insmod font
 if loadfont $prefix/theme/dejavusansmono12.pf2 ; then
+  loadfont $prefix/theme/dejavusansmono24.pf2
+  loadfont $prefix/theme/dejavusansmono20.pf2
   loadfont $prefix/theme/dejavusansmono10.pf2
   loadfont $prefix/theme/dejavusansmono5.pf2
   set gfxmode=1024x768,800x600,640x480,auto

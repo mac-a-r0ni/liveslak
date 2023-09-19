@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.7.0.1"
+VERSION="1.8.0"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -211,7 +211,7 @@ fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
 # - each series will become a squashfs module:
-SEQ_XFCEBASE="${MINLIST},noxbase,x_base,xapbase,xfcebase local:mcpp"
+SEQ_XFCEBASE="pkglist:${MINLIST},noxbase,x_base,xapbase,xfcebase local:mcpp"
 
 # Stripped-down Base Slackware:
 SEQ_LEAN="pkglist:${MINLIST},noxbase,x_base,xapbase,xfcebase,slackpkgplus,z00_plasma5supp,z01_plasma5base,z01_swdev"
@@ -255,7 +255,7 @@ TESTINGLIST_DAW=""
 # List of kernel modules required for a live medium to boot properly;
 # Lots of HID modules added to support keyboard input for LUKS password entry;
 # Virtio modules added to experiment with liveslak in a VM.
-KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
+KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
 
 # Network kernel modules to include for NFS root support:
 NETMODS="kernel/drivers/net kernel/drivers/virtio"
@@ -1269,6 +1269,18 @@ FillMode=2
 Image=file:///usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg
 EOT
 
+# Is a dark theme requested to match the background atmosphere?
+if [ -f ${LIVE_TOOLDIR}/media/${LIVEDE,,}/bg/theme ]; then
+  if [ "$(grep -v '^#' ${LIVE_TOOLDIR}/media/${LIVEDE,,}/bg/theme)" == "dark" ]
+  then
+    mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/.config
+    cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/.config/plasmarc
+[Theme]
+name=breeze-dark
+EOT
+  fi
+fi
+
 } # End of plasma5_custom_bg()
 
 # ---------------------------------------------------------------------------
@@ -1301,6 +1313,7 @@ do
         echo "                    KTOWN, MATE, CINNAMON, DLACK, STUDIOWARE."
         echo " -e                 Use ISO boot-load-size of 32 for computers."
         echo "                    where the ISO won't boot otherwise."
+        echo "                    Default value is ${BOOTLOADSIZE}."
         echo " -f                 Forced re-generation of all squashfs modules,"
         echo "                    custom configurations and new initrd.img."
         echo " -l <localization>  Enable a different default localization"
@@ -1313,7 +1326,7 @@ do
         echo " -v                 Show debug/error output."
         echo " -z version         Define your ${DISTRO^} version (default: $SL_VERSION)."
         echo " -C                 Add RAM-based Console OS to boot menu."
-        echo " -G                 Generate ISO file from existing directory tree"
+        echo " -G                 Generate ISO file from existing directory tree."
         echo " -H hostname        Hostname of the Live OS (default: $LIVE_HOSTNAME)."
         echo " -M                 Add multilib (x86_64 only)."
         echo " -O outfile         Custom filename for the ISO."
@@ -1444,6 +1457,7 @@ esac
 
 if [ "${MSEQ#pkglist:${CORE2RAMMODS/ /,}}" != "${MSEQ}" ]; then
   # This live ISO contains core2ram modules out of the box:
+  echo "-- Native core2ram."
   CORE2RAM="NATIVE"
 fi
 if [ "${CORE2RAM}" != "NO" ]; then
@@ -1550,6 +1564,11 @@ elif [ "${LIVEDE}" == "LEAN" ] ; then
   TRIM=${TRIM:-"doc"}
 else
   TRIM=${TRIM:-"none"}
+fi
+
+# Determine additional boot parameters to be added:
+if [ -z ${KAPPEND} ]; then
+  eval KAPPEND=\$KAPPEND_${LIVEDE}
 fi
 
 # Determine possible blacklist to use:
@@ -1786,6 +1805,7 @@ sed -e "s/^\(127.0.0.1\t*\)darkstar.*/\1${LIVE_HOSTNAME}.home.arpa ${LIVE_HOSTNA
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/resolv.conf
 nameserver 8.8.4.4
 nameserver 8.8.8.8
+nameserver 1.1.1.1
 
 EOT
 
@@ -2153,6 +2173,7 @@ cat ${LIVE_TOOLDIR}/pxeserver.tpl | sed \
   -e "s/@LIVEDE@/$LIVEDE/g" \
   -e "s/@LIVEMAIN@/$LIVEMAIN/g" \
   -e "s/@MARKER@/$MARKER/g" \
+  -e "s/@KAPPEND@/$KAPPEND/g" \
   -e "s/@SL_VERSION@/$SL_VERSION/g" \
   -e "s/@VERSION@/$VERSION/g" \
   > ${LIVE_ROOTDIR}/usr/local/sbin/pxeserver
@@ -2773,6 +2794,11 @@ cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-em
 </fontconfig>
 EOT
 
+  if [ "$LIVEDE" = "DAW" ] || [ "$LIVEDE" = "LEAN" ]; then
+    # These lean installations do not support Wayland graphical sessions:
+    rm -rf ${LIVE_ROOTDIR}/usr/share/wayland-sessions
+  fi
+
 fi # End Plasma5
 
 if [ "$LIVEDE" = "DLACK" ]; then
@@ -3193,6 +3219,10 @@ touch ${LIVE_ROOTDIR}/etc/fastboot
 # We will not write to the hardware clock:
 sed -i -e '/systohc/s/^/# /' ${LIVE_ROOTDIR}/etc/rc.d/rc.6
 
+# Don't try to re-mount our squashfs and overlay filesystems:
+sed -e 's/^ *SKIPFS="no/&squashfs,nooverlay,no/' \
+  -i ${LIVE_ROOTDIR}/etc/rc.d/rc.S
+
 # Run some package setup scripts (usually run by the slackware installer),
 # as well as some of the delaying commands in rc.M and rc.modules:
 
@@ -3381,6 +3411,12 @@ tar -C ${LIVE_ROOTDIR}/boot/initrd-tree/ -xf ${DHCPD_PKG} \
   var/lib/dhcpcd lib/dhcpcd sbin/dhcpcd usr/lib${DIRSUFFIX}/dhcpcd \
   etc/dhcpcd.conf.new
 mv ${LIVE_ROOTDIR}/boot/initrd-tree/etc/dhcpcd.conf{.new,}
+# Create the dhcpcd account because we added the package to the initrd:
+if ! grep -q dhcpcd ${LIVE_ROOTDIR}/boot/initrd-tree/etc/passwd; then
+  echo "dhcpcd:x:68:68:User for dhcpcd:/var/lib/dhcpcd:/bin/false" >> ${LIVE_ROOTDIR}/boot/initrd-tree/etc/passwd
+  echo "dhcpcd:x:68:" >> ${LIVE_ROOTDIR}/boot/initrd-tree/etc/group
+fi
+
 # Add getfattr to read extended attributes (even if we won't need it):
 ATTR_PKG=$(find ${DEF_SL_PKGROOT}/../ -name "attr-*.t?z" |head -1)
 tar --wildcards -C ${LIVE_ROOTDIR}/boot/initrd-tree/ -xf ${ATTR_PKG} \
@@ -3448,11 +3484,6 @@ mv ${LIVE_BOOT}/boot/initrd_${KVER}.img ${LIVE_STAGING}/boot/initrd.img
 # Squash the boot directory into its own module:
 mksquashfs ${LIVE_BOOT} ${LIVE_MOD_SYS}/0000-${DISTRO}_boot-${SL_VERSION}-${SL_ARCH}.sxz -noappend -comp ${SQ_COMP} ${SQ_COMP_PARAMS}
 
-# Determine additional boot parameters to be added:
-if [ -z ${KAPPEND} ]; then
-  eval KAPPEND=\$KAPPEND_${LIVEDE}
-fi
-
 # Copy the syslinux configuration.
 # The next block checks here for a possible UEFI grub boot image:
 cp -a ${LIVE_TOOLDIR}/syslinux ${LIVE_STAGING}/boot/
@@ -3474,7 +3505,7 @@ if [ "$SL_ARCH" = "x86_64" -o "$EFI32" = "YES" ]; then
 
   # Create the grub fonts used in the theme.
   # Command outputs string like this: "Font name: DejaVu Sans Mono Regular 5".
-  for FSIZE in 5 10 12 20 ; do
+  for FSIZE in 5 10 12 20 24 ; do
     grub-mkfont -s ${FSIZE} -av \
       -o ${LIVE_STAGING}/EFI/BOOT/theme/dejavusansmono${FSIZE}.pf2 \
       /usr/share/fonts/TTF/DejaVuSansMono.ttf \

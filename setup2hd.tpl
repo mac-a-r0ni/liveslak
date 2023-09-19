@@ -97,7 +97,7 @@ sleep 1
 vgchange -ay 1> /dev/null 2> /dev/null
 if probe -l 2> /dev/null | grep -E 'Linux$' 1> /dev/null 2> /dev/null ; then
  RUNPART=no
- probe -l 2> /dev/null | grep -E 'Linux$' | sort 1> $TMP/SeTplist 2> /dev/null
+ probe -l 2>/dev/null |grep -E 'Linux$' |sort |uniq 1>$TMP/SeTplist 2>/dev/null
  ${DIALOG} --backtitle "@CDISTRO@ Linux Setup (Live Edition)" \
   --title "LINUX PARTITIONS DETECTED" \
   --yes-label "Continue" --no-label "Skip" --defaultno \
@@ -121,6 +121,10 @@ To do this, you'll get a chance to make these partitions now using \
 'cfdisk' (MBR partitions) or 'cgdisk' (GPT partitions)." 10 64
 fi
 if [ -d /sys/firmware/efi ]; then
+  # First, let's make sure that efivarfs is active:
+  if [ "$(/bin/ls /sys/firmware/efi/efivars 2> /dev/null | wc -l)" = "0" ]; then
+    mount -t efivarfs none /sys/firmware/efi/efivars
+  fi
   if ! probe -l 2> /dev/null | grep "EFI System Partition" 1> /dev/null 2> /dev/null ; then
     RUNPART=yes
     ${DIALOG} --backtitle "@CDISTRO@ Linux Setup (Live Edition)" \
@@ -156,11 +160,11 @@ ROOT_DEVICE="`mount | grep "on / " | cut -f 1 -d ' '`"
 echo "$ROOT_DEVICE" > $TMP/SeTrootdev
 if mount | grep /var/log/mount 1> /dev/null 2> /dev/null ; then # clear source location:
   # In case of bind mounts, try to unmount them first:
-  umount /var/log/mount/dev 2> /dev/null
-  umount /var/log/mount/proc 2> /dev/null
-  umount /var/log/mount/sys 2> /dev/null
+  umount -R /var/log/mount/dev 2> /dev/null
+  umount -R /var/log/mount/proc 2> /dev/null
+  umount -R /var/log/mount/sys 2> /dev/null
   # Unmount target partition:
-  umount /var/log/mount
+  umount -R /var/log/mount
 fi
 # Anything mounted on /var/log/mount now is a fatal error:
 if mount | grep /var/log/mount 1> /dev/null 2> /dev/null ; then
@@ -260,9 +264,9 @@ Alternate keys may also be used: '+', '-', and TAB." 14 72 5 \
     cat /usr/sbin/eliloconfig > $T_PX/usr/sbin/eliloconfig
   fi
   # Make bind mounts for /dev, /proc, and /sys:
-  mount -o bind /dev $T_PX/dev 2> /dev/null
-  mount -o bind /proc $T_PX/proc 2> /dev/null
-  mount -o bind /sys $T_PX/sys 2> /dev/null
+  mount -o rbind /dev $T_PX/dev 2> /dev/null
+  mount -o rbind /proc $T_PX/proc 2> /dev/null
+  mount -o rbind /sys $T_PX/sys 2> /dev/null
   SeTconfig
   REPLACE_FSTAB=Y
   if [ -r $TMP/SeTnative ]; then
@@ -317,7 +321,7 @@ if mount | grep /var/log/mntiso 1> /dev/null 2> /dev/null ; then
  umount -f /var/log/mntiso
 fi
 if mount | grep /var/log/mount 1> /dev/null 2> /dev/null ; then
- umount /var/log/mount
+ umount -R /var/log/mount
 fi
 # Anything mounted on /var/log/mount now is a fatal error:
 if mount | grep /var/log/mount 1> /dev/null 2> /dev/null ; then

@@ -162,7 +162,7 @@ EOT
       /etc/slackpkg \
       /etc/vconsole.conf \
       /var/lib/sddm/state.conf \
-      /var/lib/slackpkg/current
+      /var/lib/slackpkg
     # Point xdm to the custom /etc/X11/xdm/liveslak-xdm/xdm-config:
     sed -i ${T_PX}/etc/rc.d/rc.4 -e 's,bin/xdm -nodaemon,& -config /etc/X11/xdm/liveslak-xdm/xdm-config,'
     # If gcc was not installed, create a symlink to cpp pointing to mcpp;
@@ -224,7 +224,8 @@ EOT
           /home/@LIVEUID@/.jackdrc \
           /home/@LIVEUID@/.config/autostart/qjackctl.desktop \
           /home/@LIVEUID@/.config/rncbc.org/QjackCtl.conf \
-          /home/@LIVEUID@/.config/kscreenlockerrc
+          /home/@LIVEUID@/.config/kscreenlockerrc \
+          /home/@LIVEUID@/.config/plasmarc
       fi
     fi
 
@@ -251,11 +252,12 @@ EOT
   - default runlevel
   - keyboard layout
   - language setting
+  - slackpkg/slackpkg+
 
 EOF
     ${DIALOG} --backtitle "@CDISTRO@ Linux Setup (Live Edition)" \
       --title "POST INSTALL HINTS AND TIPS" --msgbox "`cat $TMP/tempmsg`" \
-      18 65
+      19 65
     rm $TMP/tempmsg
 
     MAINSELECT="CONFIGURE"

@@ -118,6 +118,7 @@ rttr
 #ruby
 rxvt
 # xapbase:
+#libptytty
 #rxvt-unicode
 #sane
 # x_base:

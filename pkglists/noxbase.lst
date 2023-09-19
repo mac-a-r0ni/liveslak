@@ -18,6 +18,7 @@ db48
 dbus
 dbus-glib
 ddrescue
+efibootmgr
 efivar
 elfutils
 elogind
@@ -63,6 +64,7 @@ libcddb
 libcdio
 libcdio-paranoia
 libcgroup
+libdeflate
 libdvdnav
 libdvdread
 libexif

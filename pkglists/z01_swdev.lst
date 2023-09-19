@@ -13,8 +13,17 @@ gettext
 guile
 intltool
 libtool
+lua
 m4
 make
+python-build
+python-flit-core
+python-glad2
+python-installer
+python-lxml
+python-pyproject-hooks
+python-tomli-w
+python-wheel
 # z00_plasma5supp.lst:
 gcc-g++
 gcc-gfortran

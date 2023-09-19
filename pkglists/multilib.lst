@@ -115,6 +115,7 @@ libcdio-paranoia-compat32
 libclc-compat32
 libcroco-compat32
 libdbusmenu-compat32
+libdeflate-compat32
 libdvdnav-compat32
 libedit-compat32
 libexif-compat32

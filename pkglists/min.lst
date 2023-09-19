@@ -11,6 +11,7 @@ binutils
 # Add 'bind' at the end because it does a chroot:
 #bind
 bsd-games
+btrfs-progs
 bzip2
 ca-certificates
 coreutils
@@ -34,6 +35,7 @@ elvis
 etc
 eudev
 exfatprogs
+f2fs-tools
 file
 findutils
 floppy
@@ -55,11 +57,13 @@ haveged
 hostname
 idnkit
 infozip
+inih
 inotify-tools
 iproute2
 iptables
 iputils
 jemalloc
+jfsutils
 kbd
 kernel-generic
 kernel-firmware
@@ -144,14 +148,17 @@ sysvinit
 sysvinit-scripts
 tar
 terminus-font
+tmux
 traceroute
 usbutils
+userspace-rcu
 utempter
 util-linux
 wget
 which
 whois
 zstd
+xfsprogs
 xxHash
 xz
 # Bind needs to run at the end:

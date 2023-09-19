@@ -166,23 +166,40 @@ This script, called 'iso2usb.sh', accepts the following parameters: <code>
   -f|--force                 Ignore most warnings (except the back-out).
   -h|--help                  This help.
   -i|--infile <filename>     Full path to the ISO image file.
+  -l|--lukshome <name>       Custom path to the containerfile for your LUKS
+                             encrypted /home (slhome by default).
   -o|--outdev <filename>     The device name of your USB drive.
-  -p|--persistence <name>    Custom name of the 'persistence' directory/file.
-                             If it does not exist yet, create it manually.
+  -p|--persistence <name>    Custom path to the 'persistence' directory
+                             or containerfile (persistence by default).
   -r|--refresh               Refresh the USB stick with the ISO content.
                              No formatting, do not touch user content.
   -s|--scan                  Scan for insertion of new USB device instead of
                              providing a devicename (using option '-o').
   -u|--unattended            Do not ask any questions.
   -v|--verbose               Show verbose messages.
-  -w|--wait<number>          Add <number> seconds wait time to initialize USB.
+  -w|--wait <number>         Add <number> seconds wait time to initialize USB.
+  -y|--layout <x,x,x,x>      Specify partition layout and sizes (in MB).
+                             Default values: '1,100,-1,' for 3 partitions,
+                             the '-1' value for partition 3 meaning
+                             'use all remaining space',
+                             and an empty 4th value means 'do not reserve
+                             free space for a custom 4th partition'.
   -C|--cryptpersistfile size|perc
                              Use a LUKS-encrypted 'persistence' file instead
                              of a directory (for use on FAT filesystem).
                              Format for size/percentage is the same
                              as for the '-c' parameter.
+  -F|--filesystem <fs>       Specify filesystem to create when formatting
+                             devices/containers. Defaults to 'ext4',
+                             Choices are btrfs,ext2,ext4,f2fs,jfs,xfs.
+                             Note that the linux partition will always be
+                             formatted as 'ext4' because extlinux is used
+                             as the BIOS bootloader.
   -P|--persistfile           Use an unencrypted 'persistence' file instead
                              of a directory (for use on FAT filesystem).
+                             Persistent data will not be migrated
+                             when switching from directory to container file.
+
 </code>
 Examples:
 
@@ -192,8 +209,10 @@ Examples:
     # ./iso2usb.sh -i slackware64-live-current.iso -o /dev/sdX -c 750M -w 15
   * Create a USB Live with an encrypted /home (allocating 30% of the stick's free space for /home) and where the persistent data will be stored in a container file instead of a directory:
     # ./iso2usb.sh -i slackware64-live-current.iso -o /dev/sdX -c 30% -P
-  * Create a USB Live with both the /home and the persistent data encrypted (the persistence filesystem will be 300 MB in size):
-    # ./iso2usb.sh -i slackware64-live-current.iso -o /dev/sdX -c 30% -C 300M
+  * Create a USB Live with both the /home and the persistent data encrypted (the persistence filesystem will be 300 MB in size) using a btrfs filesystem:
+    # ./iso2usb.sh -i slackware64-live-current.iso -o /dev/sdX -F btrfs -c 30% -C 300M
+  * Create a 32bit USB Live but use a custom partition layout: create a 1 MB BIOS boot partition and a 200 MB EFI partition, add a 4th un-used $ GB partition at the end, and allocate all remaining disk space to the main Linux partition:
+    # iso2usb.sh -i slackware-live-current.iso -o /dev/sdX -y 1,200,-1,4096
   * Refresh the system modules on a USB Live using a Live ISO as the source.  Let the script scan for insertion of a USB stick instead of specifying the device name on the commandline.  Note that the addons and optional modules will not be touched by this action:
     # ./iso2usb.sh -i slackware64-live-current.iso -r -s
 
@@ -227,11 +246,12 @@ The script is called 'isocomp.sh', and it accepts the following parameters: <cod
                                 file to be created in the filesystem
                                 (filename extension must be '.icc'!).
   -x|--extend <fullpath>        Full path to existing (encrypted) container
-                                file that you want to extend in size
-                                (filename needs to end in '.icc'!).
+                                file that you want to extend in size.
                                 Limitations:
-                                - container needs to be LUKS encrypted, and
-                                - internal filesystem needs to be ext{2,3,4}.
+                                - container needs to be LUKS encrypted.
+                                - filename needs to end in '.icc'.
+                                Supported filesystems inside container:
+                                - btrfs,ext2,ext4,f2fs,jfs,xfs.
   -L|--lcsize <size|perc>       Size of LUKS encrypted /home ; value is the
                                 requested size of the container in kB, MB, GB,
                                 or as a percentage of free space
@@ -252,7 +272,7 @@ Some examples of what the script can do, are given when you run the script with 
 
   * Create a 1GB encrypted persistence container:
     # ./isocomp.sh -p /run/media/<user>/Ventoy/myfiles/persistence.icc -P 1G
-  * Create a 4GB encrypted home:
+  * Create a 4GB encrypted home with btrfs filesystem:
     # ./isocomp.sh -l /run/media/<user>/Ventoy/somedir/lukscontainers.icc -L 4000M -i /run/media/<user>/Ventoy/slackware64-live-current.iso
   * Increase the size of that encrypted home container with another 2GB:
     # ./isocomp.sh -x /run/media/<user>/Ventoy/somedir/lukscontainers.icc -X 2G -i /run/media/<user>/Ventoy/slackware64-live-current.iso
@@ -306,6 +326,7 @@ Before making any modifications, the script will show you a prompt at which poin
 This script, called 'upslak.sh', accepts the following parameters: <code>
   -b|--nobackup              Do not try to backup original kernel and modules.
   -d|--devices               List removable devices on this computer.
+  -e|--examples              Show some common usage examples.
   -h|--help                  This help.
   -i|--init <filename>       Replacement init script.
   -k|--kernel <filename>     The kernel file (or package).
@@ -318,6 +339,26 @@ This script, called 'upslak.sh', accepts the following parameters: <code>
                              providing a devicename (using option '-o').
   -v|--verbose               Show verbose messages.
   -w|--wait<number>          Add <number> seconds wait time to initialize USB.
+  -x|--extend <fullpath>     Full path (either in your filesystem or else
+                             relative to the USB partition root)
+                             to an existing (encrypted) container file,
+                             whose size you want to extend.
+                             Limitations:
+                             - container needs to be LUKS encrypted.
+                             - filename extension needs to be '.img'.
+                             Supported filesystems inside container:
+                             - btrfs,ext2,ext4,f2fs,jfs,xfs.
+  -N|--nolivemods            Don't create an addon live module containing
+                             the new kernelmodules. Normally you *will* need
+                             this addon module, *unless* you have already
+                             installed these kernel-modules in the Live OS.
+                             FYI: the kernel and module upgrade applies only
+                             to the USB boot kernel and its initrd.
+  -X|--extendsize <size|perc> Extend size of existing container; value
+                             is the requested extension of the container
+                             in kB, MB, GB, or as percentage of free space
+                             (integer numbers only).
+                             Examples: '-X 125M', '-X 2G', '-X 20%'.
 </code>
 Examples:
 
@@ -328,7 +369,10 @@ Examples:
   * Restore the previous kernel and modules after a failed update, and let the script scan your computer for the insertion of your USB stick:
     # ./upslak.sh -s -r
   * Replace the Live init script with the latest template taken from the git repository:
-    # ./upslak.sh -o /dev/sdX -i liveslak/liveinit.tpl
+    # wget https://git.liveslak.org/liveslak/plain/liveinit.tpl
+    # ./upslak.sh -o /dev/sdX -i liveinit.tpl
+  * Extend the size of the pre-existing LUKS container for your homedirectory with 3 GB, and let the script scan for the insertion of your USB stick:
+    # ./upslak.sh -s -x /slhome.img -X 3G
 
 
 ==== PXE booting the Live OS ====
@@ -658,7 +702,7 @@ The "iso2usb.sh" script wipes and re-partitions the USB stick unless the "-r" or
   * Second partition: a 100 MB VFAT partition containing the kernel, initrd and all the other stuff required by syslinux and grub2 to boot Slackware Live Edition.
   * Third partition: a Linux partition taking up all of the remaining space. It contains the actual liveslak modules, the persistent live storage and optionally your encrypted homedirectory. You can use the remainder of this Linux ext4 filesystem's free space to store anything you like.
 
-Note that this script is the only supported method of transfering the liveslak ISO content to a USB stick and make that USB stick into a persistent live OS.  Several 3rd party tools (like multibootusb, rufus, unetbootin) that claim to be able to mix several Live OS'es on a single USB stick and make them all work in a multi-boot setup, are not currently supporting liveslak.
+Note that this script extracts the ISO contents to transform a USB stick into into a persistent live OS. This is a destructive process, erasing all previously available content on that stick. Several 3rd party tools (like multibootusb, rufus, unetbootin) that claim to be able to mix several Live OS'es on a single USB stick and make them all work in a multi-boot setup, are not currently supporting liveslak. Ventoy on the other hand, is fully supported by liveslak and therefore your best bet if you don't want to wipe your data off your USB stick. As a bonus, the ''isocomp.sh'' script is able to add persistence to a liveslak ISO on a Ventoy boot disk. 
 
 == Mounting a filesystem in an encrypted container ==
 
@@ -713,7 +757,7 @@ If the container is used for an encrypted /home, the script will copy the existi
 
 == Extending the size of an existing container file ==
 
-The 'isocomp.sh' script is able to extend your encrypted containers if you are running out of space on their enclosed filesystems.  It does this by appending random bytes to the end of the file, unlocking and mounting the filesystem inside, and then resizing that filesystem so it grows to the new size of the container. Note that only containers with an internal ''ext4'' filesystem are supported.
+The 'isocomp.sh' script is able to extend your encrypted containers if you are running out of space on their enclosed filesystems.  It does this by appending random bytes to the end of the file, unlocking and mounting the filesystem inside, and then resizing that filesystem so it grows to the new size of the container.
 
 
 === makemod ===
@@ -792,9 +836,13 @@ Depending on the parameters passed to the script, it will then perform one or mo
 You can provide a new kernel and its modules in two ways.  The '-k' option accepts a kernel image file or else a Slackware package contaning a kernel.  The '-m' option accepts a directory tree of modules below "/lib/modules/, or else a Slackware package containing kernel modules.
 If there is sufficient space on the Linux and EFI partitions, the script will make a backup of the current kernel and modules by renaming the kernel and the module directory with a ".prev" suffix.  Sufficient space means that at least 10 MB of free space must remain on the partition(s) after making the backup and installing the new kernel plus modules. If space is an issue, you can skip making a backup by providing the '-b' parameter to the script (a possibly unsafe choice).
 
+Note that these new kernel-modules will be added to the initrd image (they are needed when booting the new kernel). In order for the Live OS to keep working with the new kernel however, these new kernel-modules must also be made available to the Live OS. The script achieves this by creating a '''kernelmodules''' squashfs module and copying the module into the '''addons''' directory of the liveslak installation on your USB stick. When the Live OS boots, the kernelmodules will then automatically be merged into the live filesystem.
+It is possible to skip the creation of this squashfs module via the '-N' switch to the script.
+
 == Restore backed-up kernel and modules ==
 
 If a backup was made of kernel and modules, the upslak.sh script is able to restore these using the '-r' option, thereby removing the replacements.  This comes in handy when the replacement kernel turns out to be non-functional.
+Note that restoring the old kernel and its modules will leave an orphaned squashfs kernelmodule in liveslak's '''addons''' directory. You can safely delete that file.
 
 == Add network support modules ==
 
@@ -807,6 +855,10 @@ Similar to the functionality of the "iso2usb.sh" script, the "upslak.sh" script 
 == Replace the liveslak init script ==
 
 The init script inside the initrd image is the core of liveslak.  The init script prepares the Live filesystem and configures several run-time OS parameters.  If you have made modifications to this init script you can easily replace the default init script with your own script using the '-i' option.  The "upslak.sh" script is smart enough to recognize a iveslak template as input.  The ".tpl" extension of some liveslak files means that these are templates.  They are not usable as-is, because they contain placeholder strings like "@VERSION@" or "@DISTRO@" that first need to be replaced with real values.  The "upslak.sh" script will take care of these substitutions.
+
+== Extend the size of an existing LUKS container ==
+
+Your Slackware Live USB stick will probably have two LUKS containers: one for your ''/home'' directory and the other to store persistent data. If space is running out inside such a container, you can use the '-x' and '-X' parameters to the script to indicate the relevant container and provide a size increase for it. Your data inside the container is safe; the filesystem inside it will be extended and this does not touch existing file data.
 
 == Wrap persistence data into a new squashfs module ==
 
@@ -879,7 +931,8 @@ The script's parameters are:
                     DAW (Digital Audio Workstation), XFCE (basic XFCE,
                     stripped), KTOWN (ktown Plasma5 replacement), MATE
                     (Gnome2 fork replaces KDE), CINNAMON (fork of Gnome3 Shell
-                    replaces KDE), DLACK (Gnome3 replaces KDE).
+                    replaces KDE), DLACK (Gnome3 replaces KDE),
+                    STUDIOWARE (Multimedia Studio).
  -e                 Use ISO boot-load-size of 32 for computers
                     where the ISO won't boot otherwise (default: 4).
  -f                 Forced re-generation of all squashfs modules,
@@ -894,7 +947,7 @@ The script's parameters are:
  -v                 Show debug/error output.
  -z version         Define your Slackware version (default: current).
  -C                 Add RAM-based Console OS to boot menu.
- -G                 Generate ISO file from existing directory tree
+ -G                 Generate ISO file from existing directory tree.
  -H hostname        Hostname of the Live OS (default: darkstar).
  -M                 Add multilib (x86_64 only).
  -O outfile         Custom filename for the ISO.

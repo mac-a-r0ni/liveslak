@@ -50,6 +50,10 @@ VERSION=""
 DEFEXT=".icc"
 CNTEXT="${DEFEXT}"
 
+# Default filesystem for devices/containers:
+DEF_FS="ext4"
+FSYS="${DEF_FS}"
+
 # Default mount point for a LUKS container if not specified:
 DEFMNT="/home"
 LUKSMNT=""
@@ -71,8 +75,10 @@ LIVESLAKROOT=""
 # Define ahead of time, so that cleanup knows about them:
 IMGDIR=""
 ISOMNT=""
+CNTDEV=""
 CNTMNT=""
 EXTENSION=""
+LODEV=""
 PERSISTENCE=""
 
 # Minimim free space (in MB) we want to have left in any partition
@@ -85,14 +91,14 @@ MINFREE=${MINFREE:-10}
 COMPR="xz --check=crc32"
 
 # These tools are required by the script, we will check for their existence:
-REQTOOLS="cpio cryptsetup fsck gzip isoinfo lsblk resize2fs unsquashfs xz zstd"
+REQTOOLS="cpio cryptsetup fsck gzip isoinfo lsblk unsquashfs xz zstd"
 
 #
 #  -- function definitions --
 #
 
 # Clean up in case of failure:
-cleanup() {
+function cleanup() {
   # Clean up by unmounting our loopmounts, deleting tempfiles:
   echo "--- Cleaning up the staging area..."
   # During cleanup, do not abort due to non-zero exit code:
@@ -103,7 +109,7 @@ cleanup() {
     # In case of failure, only most recent LUKS mapped device is still open:
     if mount | grep -q ${CNTDEV} ; then
       umount -f ${CNTDEV}
-      cryptsetup luksClose $(basename ${CNTFILE} ${CNTEXT})
+      cryptsetup luksClose $(basename ${CNTDEV})
       losetup -d ${LODEV}
     fi
   fi
@@ -116,7 +122,7 @@ cleanup() {
 trap 'echo "*** $0 FAILED at line $LINENO ***"; cleanup; exit 1' ERR INT TERM
 
 # Show the help text for this script:
-showhelp() {
+function showhelp() {
 cat <<EOT
 #
 # Purpose: enhance the functionality when booting a Slackware Live ISO file.
@@ -146,10 +152,14 @@ cat <<EOT
 #                                 (filename extension must be '${CNTEXT}'!).
 #   -x|--extend <fullpath>        Full path to existing (encrypted) container
 #                                 file that you want to extend in size
-#                                 (filename needs to end in '${CNTEXT}'!).
 #                                 Limitations:
-#                                 - container needs to be LUKS encrypted, and
-#                                 - internal filesystem needs to be ext{2,3,4}.
+#                                 - container needs to be LUKS encrypted.
+#                                 - filename extension needs to be '${CNTEXT}'.
+#                                 Supported filesystems inside container:
+#                                 - $(resizefs).
+#   -F|--filesystem <fs>          Specify filesystem to create when formatting
+#                                 devices/containers. Defaults to '${DEF_FS}',
+#                                 Choices are $(createfs).
 #   -L|--lcsize <size|perc>       Size of LUKS encrypted /home ; value is the
 #                                 requested size of the container in kB, MB, GB,
 #                                 or as a percentage of free space
@@ -170,7 +180,7 @@ EOT
 } # End of showhelp()
 
 # Show some common usage examples:
-showexamples() {
+function showexamples() {
 cat <<EOT
 #
 # Some common usage examples for $(basename $0)
@@ -182,8 +192,8 @@ cat <<EOT
 # Create a 1GB encrypted persistence container:
 #   ./$(basename $0) -p /run/media/<user>/Ventoy/myfiles/persistence.icc -P 1G
 #
-# Create a 4GB encrypted home:
-#   ./$(basename $0) -l /run/media/<user>/Ventoy/somedir/lukscontainers.icc -L 4000M -i /run/media/<user>/Ventoy/slackware64-live-current.iso
+# Create a 4GB encrypted home with btrfs filesystem:
+#   ./$(basename $0) -l /run/media/<user>/Ventoy/somedir/lukscontainers.icc -L 4000M -F btrfs -i /run/media/<user>/Ventoy/slackware64-live-current.iso
 #
 # Increase the size of that encrypted home container with another 2GB:
 #   ./$(basename $0) -x /run/media/<user>/Ventoy/somedir/lukscontainers.icc -X 2G -i /run/media/<user>/Ventoy/slackware64-live-current.iso
@@ -197,8 +207,110 @@ cat <<EOT
 EOT
 } # End of showexamples()
 
+# Create a filesystem on a partition with optional label:
+function createfs () {
+  MYDEV="${1}"
+  MYFS="${2:-'ext4'}"
+  MYLABEL="${3}"
+
+  if [ -n "${MYLABEL}" ]; then
+    case "${MYFS}" in
+    fs2s) MYLABEL="-l ${MYLABEL}" ;;
+    *)    MYLABEL="-L ${MYLABEL}" ;;
+    esac
+  fi
+
+  if [ -z "${MYDEV}" ]; then
+    # Without arguments given, reply with list of supported fs'es:
+    echo  "btrfs,ext2,ext4,f2fs,jfs,xfs"
+    return
+  fi
+  case "${MYFS}" in
+    btrfs) mkfs.btrfs -f -d single -m single ${MYLABEL} ${MYDEV}
+           ;;
+    ext2)  mkfs.ext2 -F -F ${MYLABEL} ${MYDEV}
+           # Tune the ext2 filesystem:
+           tune2fs -m 0 -c 0 -i 0 ${MYDEV}
+           ;;
+    ext4)  mkfs.ext4 -F -F ${MYLABEL} ${MYDEV}
+           # Tune the ext4 filesystem:
+           tune2fs -m 0 -c 0 -i 0 ${MYDEV}
+           ;;
+    f2fs)  mkfs.f2fs ${MYLABEL} -f ${MYDEV}
+           ;;
+    jfs)   mkfs.jfs -q ${MYDEV}
+           ;;
+    xfs)   mkfs.xfs -f ${MYDEV}
+           ;;
+    *)     echo "*** Unsupported filesystem '${MYFS}'!"
+           cleanup
+           exit 1
+           ;;
+  esac
+} # End of createfs()
+
+# Resize the filesystem on a block device:
+function resizefs() {
+  local MYDEV="${1}"
+
+  if [ -z "${MYDEV}" ]; then
+    # Without arguments given, reply with list of supported fs'es:
+    echo  "btrfs,ext2,ext4,f2fs,jfs,xfs"
+    return
+  fi
+
+  # Determine the current filesystem for the block device:
+  local MYFS=$(lsblk -n -o FSTYPE ${MYDEV})
+  if [ -z "${MYFS}" ]; then
+    echo "*** Failed to resize filesystem on device '${MYDEV}'!"
+    echo "*** No filesystem found."
+    cleanup
+    exit 1
+  fi
+
+  local TMPMNT=$(mktemp -d -p /tmp -t alienres.XXXXXX)
+  if [ ! -d $TMPMNT ]; then
+    echo "*** Failed to create temporary mount for the filesystem resize!"
+    cleanup
+    exit 1
+  else
+    chmod 711 ${TMPMNT}
+  fi
+
+  # Mount the block device prior to the resize
+  # (btrfs, jfs and xfs do not support offline resize):
+  mount -o rw -t ${MYFS} ${MYDEV} ${TMPMNT}
+
+  # Resize the filesystem to occupy the full new device capacity:
+  case "${MYFS}" in
+    btrfs) btrfs filesystem resize max ${TMPMNT}
+           ;;
+    ext*)  resize2fs ${MYDEV}
+           ;;
+    f2fs)  resize.f2fs ${MYDEV}
+           ;;
+    jfs)   mount -o remount,resize,rw ${TMPMNT}
+           ;;
+    xfs)   xfs_growfs -d ${TMPMNT}
+           ;;
+    *)     echo "*** Unsupported filesystem '${MYFS}'!"; exit 1
+           ;;
+  esac
+
+  if [ ! $? ]; then
+    echo "*** Failed to resize '${MYFS}'filesystem on device '${MYDEV}'!"
+    cleanup
+    exit 1
+  else
+    # Un-mount the device again:
+    sync
+    umount ${TMPMNT}
+    rmdir ${TMPMNT}
+  fi
+} # End of checkfs()
+
 # Uncompress the initrd based on the compression algorithm used:
-uncompressfs () {
+function uncompressfs () {
   if $(file "${1}" | grep -qi ": gzip"); then
     gzip -cd "${1}"
   elif $(file "${1}" | grep -qi ": XZ"); then
@@ -206,19 +318,21 @@ uncompressfs () {
   fi
 } # End of uncompressfs()
 
-# Read configuration data from the initrd inside the ISO:
-read_initrd() {
+# Read configuration data from the initrd inside the ISO,
+# after it has been extracted into a directory:
+function read_initrddir() {
   local IMGDIR="$1"
+  local INITVARS="$2"
   cd ${IMGDIR}
 
   # Read the values of liveslak template variables in the init script:
-  for TEMPLATEVAR in DISTRO LIVEMAIN MARKER MEDIALABEL ; do
+  for TEMPLATEVAR in ${INITVARS} ; do
     eval $(grep "^ *${TEMPLATEVAR}=" ./init |head -1)
   done
-} # End read_initrd()
+} # End of read_initrddir()
 
 # Extract the initrd:
-extract_initrd() {
+function extract_initrd() {
   local IMGFILE="$1"
   local IMGDIR=$(mktemp -d -p /tmp -t alienimg.XXXXXX)
   if [ ! -d $IMGDIR ]; then
@@ -236,21 +350,21 @@ extract_initrd() {
 } # End of extract_initrd()
 
 # Determine size of a mounted partition (in MB):
-get_part_mb_size() {
+function get_part_mb_size() {
   local MYSIZE
   MYSIZE=$(df -P -BM ${1} |tail -n -1 |tr -s '\t' ' ' |cut -d' ' -f2)
   echo "${MYSIZE%M}"
 } # End of get_part_mb_size()
 
 # Determine free space of a mounted partition (in MB):
-get_part_mb_free() {
+function get_part_mb_free() {
   local MYSIZE
   MYSIZE=$(df -P -BM ${1} |tail -n -1 |tr -s '\t' ' ' |cut -d' ' -f4)
   echo "${MYSIZE%M}"
 } # End of get_part_mb_free()
 
 # Determine requested container size in MB (allow for '%|k|K|m|M|g|G' suffix):
-cont_mb() {
+function cont_mb() {
   local MYSIZE="$1"
   case "${MYSIZE: -1}" in
      "%") MYSIZE="$(( $PARTFREE * ${MYSIZE%\%} / 100 ))" ;;
@@ -266,7 +380,7 @@ cont_mb() {
 } # End of cont_mb()
 
 # Expand existing encrypted container file:
-expand_container() {
+function expand_container() {
   local MYPART="$1" # disk partition
   local MYINC="$2"  # requested increase ('%|k|K|m|M|g|G' suffix)
   local MYFILE="$3" # full path to ${CNTEXT} containerfile
@@ -289,29 +403,47 @@ expand_container() {
   # Append random bytes to the end of the container file:
   dd if=/dev/urandom of=${MYFILE} bs=1M count=${MYINC} oflag=append conv=notrunc 2>/dev/null
 
-  # Unlock the LUKS encrypted container:
-  MYMAP=$(basename ${MYFILE} ${CNTEXT})
-  echo "--- Unlocking the LUKS container requires your passphrase..."
-  until cryptsetup luksOpen ${MYFILE} ${MYMAP} ; do
-    echo ">>> Did you type an incorrect passphrases?"
-    read -p ">>> Press [ENTER] to try again or Ctrl-C to abort ..." REPLY 
-  done
+  # Setup a loopback device that we can use with or without cryptsetup:
+  LODEV=$(losetup -f)
+  losetup $LODEV ${MYFILE}
+
+  if cryptsetup isLuks ${LODEV} ; then
+    # Unlock LUKS encrypted container first:
+    MYMAP=$(basename ${MYFILE} ${CNTEXT})
+    CNTDEV=/dev/mapper/${MYMAP}
+    echo "--- Unlocking the LUKS container requires your passphrase..."
+    until cryptsetup luksOpen ${LODEV} ${MYMAP} ; do
+      echo ">>> Did you type an incorrect passphrases?"
+      read -p ">>> Press [ENTER] to try again or Ctrl-C to abort ..." REPLY 
+    done
+  else
+    # The loopmounted block device for the un-encrypted container:
+    CNTDEV=${LODEV}
+  fi
 
   # Run fsck so the filesystem is clean before we resize it:
-  fsck -fvy /dev/mapper/${MYMAP}
+  fsck -fvy ${CNTDEV}
   # Resize the filesystem to occupy the full new size:
-  resize2fs /dev/mapper/${MYMAP}
+  resizefs ${CNTDEV}
   # Just to be safe:
-  fsck -fvy /dev/mapper/${MYMAP}
+  fsck -fvy ${CNTDEV}
+
+  # Don't forget to clean up after ourselves:
+  if cryptsetup isLuks ${LODEV} ; then
+    cryptsetup luksClose ${MYMAP}
+  fi
+  losetup -d ${LODEV} || true
+
 } # End of expand_container()
 
 # Create container file in the empty space of the partition
-create_container() {
-  CNTPART=$1 # partition containing the ISO
-  CNTSIZE=$2 # size of the container file to create
-  CNTFILE=$3 # ${CNTEXT} filename with full path
-  CNTENCR=$4 # 'none' or 'luks'
-  CNTUSED=$5 # 'persistence', '/home' or custom mountpoint
+function create_container() {
+  local CNTPART=$1 # partition containing the ISO
+  local CNTSIZE=$2 # size of the container file to create
+  local CNTFILE=$3 # ${CNTEXT} filename with full path
+  local CNTENCR=$4 # 'none' or 'luks'
+  local CNTUSED=$5 # 'persistence', '/home' or custom mountpoint
+  local MYMAP
 
   # Create a container file or re-use previously created one:
   if [ -f ${CNTFILE} ]; then
@@ -346,14 +478,21 @@ create_container() {
     exit 1
   fi
 
-  echo "--- Creating ${CNTSIZE} MB container file using 'dd if=/dev/urandom', patience please..."
+  echo "--- Creating ${CNTSIZE} MB container file '$(basename =${CNTFILE})' using 'dd if=/dev/urandom', patience please..."
   mkdir -p $(dirname "${CNTFILE}")
-  # Create a sparse file (not allocating any space yet):
-  dd of=${CNTFILE} bs=1M count=0 seek=$CNTSIZE 2>/dev/null
+  if [ $? ]; then
+    # Create a sparse file (not allocating any space yet):
+    dd of=${CNTFILE} bs=1M count=0 seek=$CNTSIZE 2>/dev/null
+  else
+    echo "*** Failed to create directory for the container file!"
+    cleanup
+    exit 1
+  fi
 
   # Setup a loopback device that we can use with cryptsetup:
   LODEV=$(losetup -f)
   losetup $LODEV ${CNTFILE}
+  MYMAP=$(basename ${CNTFILE} ${CNTEXT})
   if [ "${CNTENCR}" = "luks" ]; then
     # Format the loop device with LUKS:
     echo "--- Encrypting the container file with LUKS; takes SOME time..."
@@ -364,26 +503,24 @@ create_container() {
     done
     # Unlock the LUKS encrypted container:
     echo "--- Unlocking the LUKS container requires your passphrase again..."
-    until cryptsetup luksOpen $LODEV $(basename ${CNTFILE} ${CNTEXT}) ; do
+    until cryptsetup luksOpen $LODEV ${MYMAP} ; do
       echo ">>> Did you type an incorrect passphrases?"
       read -p ">>> Press [ENTER] to try again or Ctrl-C to abort ..." REPLY 
     done
-    CNTDEV=/dev/mapper/$(basename ${CNTFILE} ${CNTEXT})
+    CNTDEV=/dev/mapper/${MYMAP}
     # Now we allocate blocks for the LUKS device. We write encrypted zeroes,
     # so that the file looks randomly filled from the outside.
     # Take care not to write more bytes than the internal size of the container:
-    echo "--- Writing random data to encrypted container; takes LONG time..."
+    echo "--- Writing ${CNTSIZE} MB of random data to encrypted container; takes LONG time..."
     CNTIS=$(( $(lsblk -b -n -o SIZE  $(readlink -f ${CNTDEV})) / 512))
-    dd if=/dev/zero of=${CNTDEV} bs=512 count=${CNTIS} 2>/dev/null || true
+    dd if=/dev/zero of=${CNTDEV} bs=512 count=${CNTIS} status=progress || true
   else
-    CNTDEV=$LODEV
     # Un-encrypted container files remain sparse.
+    CNTDEV=$LODEV
   fi
 
   # Format the now available block device with a linux fs:
-  mkfs.ext4 ${CNTDEV}
-  # Tune the ext4 filesystem:
-  tune2fs -m 0 -c 0 -i 0 ${CNTDEV}
+  createfs ${CNTDEV} ${FSYS}
 
   if [ "${CNTUSED}" == "${DEFMNT}" ]; then
     # Copy the original /home content into the container.
@@ -415,7 +552,7 @@ create_container() {
 
 } # End of create_container()
 
-read_config() {
+function read_isoconfig() {
   local MYISO="${1}"
   # Read ISO customization from the .cfg file if it exists:
     if [ -f "${MYISO%.iso}.cfg" ]; then
@@ -429,9 +566,9 @@ read_config() {
         fi
       done
     fi
-} # End of read_config()
+} # End of read_isoconfig()
 
-write_config() {
+function write_isoconfig() {
   local MYISO="${1}"
   # Write updated customization into the ISO .cfg:
   echo "# Liveslak ISO configuration file for ${VERSION}" > ${MYISO%.iso}.cfg 2>/dev/null
@@ -448,7 +585,7 @@ write_config() {
       fi 
     done
   fi
-} # End of write_config()
+} # End of write_isoconfig()
 
 #
 #  -- end of function definitions --
@@ -500,6 +637,10 @@ while [ ! -z "$1" ]; do
       EXTENSION="$(cd "$(dirname "$2")"; pwd)/$(basename "$2")"
       shift 2
       ;;
+    -F|--filesystem)
+      FSYS="$2"
+      shift 2
+      ;;
     -L|--lcsize)
       LUKSSIZE="$2"
       shift 2
@@ -527,6 +668,9 @@ if [ "$(id -u)" != "0" ]; then
   echo "*** You need to be root to run $(basename $0)."
   exit 1
 fi
+
+# Add required filesystem tools:
+REQTOOLS="${REQTOOLS} mkfs.${FSYS}"
 
 # Are all the required tools present?
 PROG_MISSING=""
@@ -670,10 +814,10 @@ fi
 
 # Collect data from the USB initrd:
 IMGDIR=$(extract_initrd ${ISOMNT}/boot/initrd.img)
-read_initrd ${IMGDIR}
+read_initrddir ${IMGDIR} "DISTRO LIVEMAIN MARKER MEDIALABEL"
 
 # Collect customization parameters for the ISO:
-read_config ${SLISO}
+read_isoconfig ${SLISO}
 
 # Determine where in LUKSVOL the /home is defined.
 # The LUKSVOL value looks like:
@@ -763,7 +907,7 @@ if [ ${#CONTAINERS[@]} -gt 0 ]; then
 fi
 
 # Write customization parameters for the ISO to disk:
-write_config ${SLISO}
+write_isoconfig ${SLISO}
 
 # Write ISO version to the liveslak rootdir if that exists:
 if [ -d "${USBMNT}/${LIVESLAKROOT}" ]; then

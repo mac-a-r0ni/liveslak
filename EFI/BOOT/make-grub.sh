@@ -37,6 +37,9 @@ EFIFORM=${EFIFORM:-"x86_64"}
 EFISUFF=${EFISUFF:-"x64"}
 EFIDIR=${EFIDIR:-"/EFI/BOOT"}
 
+# Fix the path in grub-ebedded.cfg if needed:
+sed -e "s,/EFI/BOOT,${EFIDIR}," -i grub-embedded.cfg
+
 echo
 echo "Building ${EFIDIR}/boot${EFISUFF}.efi and /boot/syslinux/efiboot.img."
 
@@ -45,7 +48,7 @@ echo "Building ${EFIDIR}/boot${EFISUFF}.efi and /boot/syslinux/efiboot.img."
 GMODDIR="$(dirname $(LANG=C grub-mkimage -O ${EFIFORM}-efi -p ${EFIDIR} alienbob 2>&1 | cut -d\` -f2 |cut -d\' -f1) )"
 GMODLIST=""
 # 'shim_lock' is built into grub, not a module anymore:
-for GMOD in part_gpt part_msdos fat ext2 f2fs iso9660 ntfs chain linux boot configfile normal regexp extcmd minicmd reboot halt search search_fs_file search_fs_uuid search_label gfxterm gfxmenu gfxterm_menu gfxterm_background efi_gop efi_uga all_video loadbios gzio echo true probe loadenv bitmap_scale font cat help ls png jpeg tga test at_keyboard usb_keyboard disk memdisk nativedisk file loopback tar tftp net efinet efifwsetup zstd ; do
+for GMOD in part_gpt part_msdos fat btrfs ext2 f2fs jfs xfs iso9660 ntfs chain linux boot configfile normal regexp extcmd minicmd reboot halt search search_fs_file search_fs_uuid search_label gfxterm gfxmenu gfxterm_menu gfxterm_background efi_gop efi_uga all_video loadbios gzio echo true probe loadenv bitmap_scale font cat help ls png jpeg tga test at_keyboard usb_keyboard disk memdisk nativedisk file loopback tar tftp net efinet efifwsetup zstd ; do
   [ -f ${GMODDIR}/${GMOD}.mod ] && GMODLIST="${GMODLIST} ${GMOD}" || echo ">> ${GMOD} not found"
 done
 

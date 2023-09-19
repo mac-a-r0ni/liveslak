@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright 2011, 2016, 2017, 2019  Eric Hameleers, Eindhoven, NL
+# Copyright 2011, 2016, 2017, 2019, 2023  Eric Hameleers, Eindhoven, NL
 # Copyright 2011  Patrick Volkerding, Sebeka, Minnesota USA
 # All rights reserved.
 #
@@ -43,6 +43,8 @@
 # - The script will detect if you have an outside network connection on
 #   another interface and will enable IP forwarding if needed, so that the
 #   PXE clients will also have network access.
+# - Optionally, the script can hide its PXE clients behind a NAT router
+#   in case external network is not accessible via normal routing.
 # - The Live OS booted via pxelinux is configured with additional boot
 #   parameters:
 #   * nfsroot=${LOCAL_IPADDR}:/mnt/livemedia
@@ -82,6 +84,14 @@ GLOBAL_GW_INT=""
 # In the above case, the global and local gateways will not be equal.
 GLOBAL_GATEWAY=""
 LOCAL_GATEWAY=""
+
+# Defining more global variables ahead of time:
+LOCAL_IPADDR=""
+LOCAL_NETMASK=""
+LOCAL_NETWORK=""
+
+# The script optionally configures a NAT gateway:
+ENABLE_NAT="no"
 
 # The Slackware setup depends on english language settings because it
 # parses program output like that of "fdisk -l". So, we need to override
@@ -128,10 +138,25 @@ if [ -n "$PXETXTSRC" ]; then
 fi
 
 # For UEFI computers:
+if [ ! -f /mnt/livemedia${UEFIPREFIX}/SLACKWARELIVE ]; then
+  # We boot from a USB stick created with isu2usb.sh:
+  if ! mount |grep -q 'on /boot/efi' ; then
+    # USB EFI partition is not yet mounted, let's find where it is:
+    LIVEPART="$(df -P /mnt/livemedia/ |tail -n1 |cut -d' ' -f1)"
+    USBDEV="/dev/$(lsblk -no pkname ${LIVEPART=})"
+    EFIPART="$(blkid -t PARTLABEL="EFI System Partition" ${USBDEV=}* |cut -d: -f1)"
+    mkdir -p /boot/efi
+    mount -t vfat -o defaults ${EFIPART} /boot/efi
+  fi
+  UEFI_TFTP="/boot/efi"
+else
+  UEFI_TFTP="/mnt/livemedia"
+fi
+# Allow the boot files to be served by tftp:
 mkdir -p  /var/lib/tftpboot${UEFIPREFIX}
-ln -sf /mnt/livemedia${UEFIPREFIX}/@MARKER@  /var/lib/tftpboot${UEFIPREFIX}/
-ln -sf /mnt/livemedia${UEFIPREFIX}/bootx64.efi  /var/lib/tftpboot${UEFIPREFIX}/
-ln -sf /mnt/livemedia${UEFIPREFIX}/theme  /var/lib/tftpboot${UEFIPREFIX}/
+ln -sf ${UEFI_TFTP}${UEFIPREFIX}/SLACKWARELIVE  /var/lib/tftpboot${UEFIPREFIX}/
+ln -sf ${UEFI_TFTP}${UEFIPREFIX}/bootx64.efi  /var/lib/tftpboot${UEFIPREFIX}/
+ln -sf ${UEFI_TFTP}${UEFIPREFIX}/theme  /var/lib/tftpboot${UEFIPREFIX}/
 
 #
 # Function definitions:
@@ -180,6 +205,8 @@ get_dhcpcd_pid() {
     echo "/run/dhcpcd-${MYDEV}.pid"
   elif [ -s /run/dhcpcd-${MYDEV}-4.pid ]; then
     echo "/run/dhcpcd-${MYDEV}-4.pid"
+  elif [ -s /run/${MYDEV}.pid ]; then
+    echo "/run/${MYDEV}.pid"
   else
     echo UNKNOWNLOC
   fi
@@ -190,6 +217,7 @@ get_nm_internal_lease() {
   # Find the lease of NetworkManager internal dhcp client:
   MYDEV="$1"
   if [ -s /var/lib/NetworkManager/intern*-${MYDEV}.lease ]; then
+    # NM is indeed managing this interface:
     echo "$(ls --indicator-style=none /var/lib/NetworkManager/intern*-${MYDEV}.lease)"
   else
     echo UNKNOWNLOC
@@ -210,7 +238,7 @@ devconfig() {
   elif ! ip -f inet -o addr show |grep -v " lo " |grep -qw 172.16 ; then
     MYIP="172.16.10.10"
   else
-    MYIP="10.10.10.10"
+    MYIP="10.16.10.10"
   fi
 
   # Main loop IP configuration:
@@ -311,17 +339,20 @@ EOF
     dhcpcd -k $MYIF 1>/dev/null 2>&1
     rm -f /run/dhcpcd/dhcpcd-${MYIF}.pid 2>/dev/null
     rm -f /run/dhcpcd-${MYIF}.pid 2>/dev/null
+    rm -f /run/${MYIF}.pid 2>/dev/null
 
     # Broadcast and network are derived from IP and netmask:
-    LOCAL_BROADCAST=$(ipmask $LOCAL_NETMASK $LOCAL_IPADDR | cut -f 1 -d ' ')
-    LOCAL_NETWORK=$(ipmask $LOCAL_NETMASK $LOCAL_IPADDR | cut -f 2 -d ' ')
+    LOCAL_BROADCAST="$(ipmask $LOCAL_NETMASK $LOCAL_IPADDR | cut -f 1 -d ' ')"
+    LOCAL_NETWORK="$(ipmask $LOCAL_NETMASK $LOCAL_IPADDR | cut -f 2 -d ' ')"
     if [ -x /etc/rc.d/rc.networkmanager 2>/dev/null ]; then
       # Use nmcli to reconfigure NetworkManager:
-      nmcli con add con-name pxe-${MYIF} ifname ${MYIF} type ethernet ip4 $LOCAL_IPADDR/$(mask_cvt $LOCAL_NETMASK)
+      nmcli con add save no con-name pxe-${MYIF} ifname ${MYIF} type ethernet
+      nmcli con mod pxe-${MYIF} ipv4.addresses ${LOCAL_IPADDR}/$(mask_cvt ${LOCAL_NETMASK}) ipv4.method manual connection.autoconnect no
       if [ "x$GLOBAL_GATEWAY" = "x" -a "x$LOCAL_GATEWAY" != "x" ]; then
         nmcli con mod pxe-${MYIF} ipv4.gateway $LOCAL_GATEWAY
       fi
-      nmcli dev connect ${MYIF}
+      nmcli con up pxe-${MYIF}
+      if [ $DEBUG -ne 0 ]; then read -p "Press ENTER to continue: " JUNK ; fi
     else
       # Use ifconfig and route commands:
       ifconfig $MYIF $LOCAL_IPADDR netmask $LOCAL_NETMASK broadcast $LOCAL_BROADCAST
@@ -405,7 +436,7 @@ Alternate keys may also be used: '+', '-', and TAB." 13 72 9 \
 
   # If our interface is configured by DHCP, it likely has a lease from a
   # LAN DHCP server, so we should not activate another DHCP server ourself now:
-  if [ -s $(get_dhcpcd_pid ${INTERFACE}) -a -n "$(ps -q $(cat $(get_dhcpcd_pid ${INTERFACE})) -o comm=)" ]; then
+  if [ -s $(get_dhcpcd_pid ${INTERFACE}) -a -n "$(ps -q $(cat $(get_dhcpcd_pid ${INTERFACE})) -o comm= 2>/dev/null)" ]; then
     OWNDHCP="no"
   elif [ -s $(get_nm_internal_lease ${INTERFACE}) ]; then
     OWNDHCP="no"
@@ -449,6 +480,23 @@ not in reach of any DHCP server." 13 68
       OWNDHCP="yes" 
     else
       OWNDHCP="no" 
+    fi
+  fi
+
+  if [ "$OWNDHCP" == "yes" ]; then
+    if [ "$INTERFACE" != "$GLOBAL_GW_INT" ]; then
+      # The default gateway for this computer is on another interface;
+      $DIALOG --title "ENABLE NAT FIREWALL" --defaultno --yesno " \
+This computer's default gateway is network interface ${GLOBAL_GW_INT}. \
+The network behind the PXE server's interface ${INTERFACE} seems to be isolated.\n\
+Do you want to hide your PXE clients behind a NAT gateway?\n\
+This may be helpful if PXE clients cannot reach the external network otherwise.\n\
+Say 'NO' if you are not sure which is best." 12 68
+      if [ $? = 0 ]; then
+        ENABLE_NAT="yes"
+      else
+        ENABLE_NAT="no"
+      fi
     fi
   fi
 
@@ -581,9 +629,9 @@ dhcp-leasefile=$TMP/pxe_dnsmasq.leases
 
 # Test for the architecture of a netboot client. PXE clients are
 # supposed to send their architecture as option 93. (See RFC 4578) .
-# The known types are x86PC, PC98, IA64_EFI, Alpha, Arc_x86,
+# The known types are X86PC, PC98, IA64_EFI, Alpha, Arc_x86,
 # Intel_Lean_Client, IA32_EFI, BC_EFI, Xscale_EFI and X86-64_EFI
-dhcp-match=x86PC,      option:client-arch, 0  #BIOS x86
+dhcp-match=X86PC,      option:client-arch, 0  #BIOS x86
 dhcp-match=BC_EFI,     option:client-arch, 7  #EFI Byte Code
 dhcp-match=X86-64_EFI, option:client-arch, 9  #EFI x86_64 
 
@@ -613,13 +661,14 @@ pxe-service=X86PC, "Boot from local hard disk", 0
 # The above 'pxe-service' menu does not always work for UEFI-based clients,
 # so alternatively you could implement a combination of 'dhcp-match' and
 # 'dhcp-boot' to provide a boot image. Here is a commented-out example:
-#dhcp-match=set:efi-x86_64,option:client-arch,7
-#dhcp-match=set:efi-x86_64,option:client-arch,9
-#dhcp-match=set:efi-x86,option:client-arch,6
-#dhcp-match=set:bios,option:client-arch,0
-#dhcp-boot=tag:efi-x86_64,"${UEFIPREFIX}/bootx64.efi"
-#dhcp-boot=tag:efi-x86,"${UEFIPREFIX}/bootia32.efi"
-#dhcp-boot=tag:bios,"bios/lpxelinux.0"
+#dhcp-match=set:BC_EFI,option:client-arch,7
+#dhcp-match=set:X86-64_EFI,option:client-arch,9
+#dhcp-match=set:X86_EFI,option:client-arch,6
+#dhcp-match=set:X86PC,option:client-arch,0
+#dhcp-boot=tag:X86-64_EFI,"${UEFIPREFIX}/bootx64.efi,${LOCAL_IPADDR}"
+#dhcp-boot=tag:BC_EFI,"${UEFIPREFIX}/bootx64.efi,${LOCAL_IPADDR}"
+#dhcp-boot=tag:X86_EFI,"${UEFIPREFIX}/bootia32.efi,${LOCAL_IPADDR}"
+#dhcp-boot=tag:X86PC,"pxelinux.0,${LOCAL_IPADDR}"
 
 EOF
 
@@ -680,7 +729,7 @@ F4 f4.txt #00000000
 
 menu hshift 1
 menu vshift 9
-menu width 45
+menu width 55
 menu margin 1
 menu rows 10
 menu helpmsgrow 14
@@ -710,7 +759,7 @@ menu color help         37;40      #ff354172 #00000000 none
 label pxelive
   menu label Boot @CDISTRO@ Linux Live (@LIVEDE@) from network
   kernel /generic
-  append initrd=/initrd.img load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 nfsroot=${LOCAL_IPADDR}:/mnt/livemedia luksvol= nop hostname=@DISTRO@ tz=$(cat /etc/timezone) locale=${SYSLANG:-"en_US.UTF-8"} kbd=${KBD:-"us"}
+  append initrd=/initrd.img @KAPPEND@ load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 nfsroot=${LOCAL_IPADDR}:/mnt/livemedia luksvol= nop hostname=@DISTRO@ tz=$(cat /etc/timezone) locale=${SYSLANG:-"en_US.UTF-8"} kbd=${KBD:-"us"}
 EOF
 
   # And a Grub configuration for UEFI boot:
@@ -738,6 +787,8 @@ insmod ext2
 # Determine whether we can show a graphical themed menu:
 insmod font
 if loadfont \$prefix/theme/dejavusansmono12.pf2 ; then
+  loadfont \$prefix/theme/dejavusansmono24.pf2
+  loadfont \$prefix/theme/dejavusansmono20.pf2
   loadfont \$prefix/theme/dejavusansmono10.pf2
   loadfont \$prefix/theme/dejavusansmono5.pf2
   set font="DejaVu Sans Mono Regular 12"
@@ -756,7 +807,7 @@ set gfxpayload=keep
 
 menuentry 'Boot @CDISTRO@ Linux Live (@LIVEDE@) from network' --class slackware --class gnu-linux --class gnu --class os {
   echo "Loading @CDISTRO@ kernel"
-  linux generic load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 nfsroot=${LOCAL_IPADDR}:/mnt/livemedia luksvol= nop hostname=@DISTRO@ tz=$(cat /etc/timezone) locale=${SYSLANG:-"en_US.UTF-8"} kbd=${KBD:-"us"}
+  linux generic @KAPPEND@ load_ramdisk=1 prompt_ramdisk=0 rw printk.time=0 nfsroot=${LOCAL_IPADDR}:/mnt/livemedia luksvol= nop hostname=@DISTRO@ tz=$(cat /etc/timezone) locale=${SYSLANG:-"en_US.UTF-8"} kbd=${KBD:-"us"}
   initrd initrd.img
   echo "Booting @CDISTRO@ kernel"
 }
@@ -777,7 +828,7 @@ while [ 0 ]; do
     --menu \
 "Welcome to @CDISTRO@ Linux Live PXE Server.\n\
 Select an option below using the UP/DOWN keys and SPACE or ENTER.\n\
-Alternate keys may also be used: '+', '-', and TAB." 13 72 9 \
+Alternate keys may also be used: '+', '-', and TAB." 11 72 7 \
 "NETWORK" "Configure your network parameters" \
 "ACTIVATE" "Activate the @CDISTRO@ PXE Server" \
 "EXIT" "Exit @CDISTRO@ PXE Setup" 2> $TMP/hdset
@@ -841,9 +892,16 @@ EOT
       # we need to enable forwarding:
       OLDROUTING=$(cat /proc/sys/net/ipv4/ip_forward)
       echo 1 > /proc/sys/net/ipv4/ip_forward
-      # also start the route daemon:
-      if [ -z "$(pidof routed)" ]; then
-        /usr/sbin/routed -g -s
+      if [ "${ENABLE_NAT}" == "yes" ]; then
+        # Add NAT firewall rule:
+        iptables -t nat -A POSTROUTING -o ${GLOBAL_GW_INT} -j MASQUERADE
+        iptables -A FORWARD -p ALL -i ${GLOBAL_GW_INT} -j ACCEPT
+        iptables -A FORWARD -m state --state ESTABLISHED,RELATED -i ${GLOBAL_GW_INT} -j ACCEPT
+      else
+        if [ -z "$(pidof routed)" ]; then
+          # Also start the route daemon:
+          /usr/sbin/routed -g -s /var/log/routed_pxeserver.log
+        fi
       fi
     else
       OLDROUTING=""
@@ -855,8 +913,16 @@ EOT
       --ok-label "EXIT" \
       --tailbox /var/log/pxe_dnsmasq.log 20 68
 
-    # Time to kill the BOOTP/TFTP/NFS servers:
-    [ -n "$OLDROUTING" ] && echo $OLDROUTING > /proc/sys/net/ipv4/ip_forward
+    # Time to kill the BOOTP/TFTP/NFS servers and revert network settings:
+    if [ "${ENABLE_NAT}" == "yes" ]; then
+      # Remove NAT firewall rule:
+      iptables -D FORWARD -m state --state ESTABLISHED,RELATED -i ${GLOBAL_GW_INT} -j ACCEPT
+      iptables -D FORWARD -p ALL -i ${GLOBAL_GW_INT} -j ACCEPT
+      iptables -t nat -D POSTROUTING -o ${GLOBAL_GW_INT} -j MASQUERADE
+    fi
+    if [ -n "$OLDROUTING" ]; then
+      echo $OLDROUTING > /proc/sys/net/ipv4/ip_forward
+    fi
     kill -TERM $(cat ${TMP}/pxe_dnsmasq.pid)
     sh /etc/rc.d/rc.nfsd stop
     sed -i -e "s%^/mnt/livemedia.*%#&%" /etc/exports
@@ -864,6 +930,18 @@ EOT
 
   if [ "$MAINSELECT" = "EXIT" ]; then
     clear
+
+    if [ -x /etc/rc.d/rc.networkmanager 2>/dev/null ]; then
+      # Use nmcli to remove the NetworkManager connection:
+      nmcli con down pxe-${INTERFACE}
+      nmcli con del pxe-${INTERFACE}
+    else
+      # Manually bring the interface down:
+      dhcpcd -k ${INTERFACE} 2>/dev/null
+      ip link set dev ${INTERFACE} down
+      ip address flush dev ${INTERFACE}
+    fi
+
     break
   fi
 

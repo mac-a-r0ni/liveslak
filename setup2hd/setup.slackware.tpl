@@ -150,6 +150,10 @@ to choose packages individually." 4 60
   else
     slackinstall --device noremount --promptmode $MODE --srcpath `cat $TMP/SeTDS` --mountpoint /var/log/mount --target $T_PX --series $SERIES
   fi
+  # Run ldconfig on the newly installed system:
+  if [ -x $T_PX/sbin/ldconfig ]; then
+    $T_PX/sbin/ldconfig -r $T_PX
+  fi
   if [ $MODE = terse ]; then
     # Let's pause a moment and then restore the terminal settings
     sleep 1

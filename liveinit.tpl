@@ -481,6 +481,8 @@ if [ "$RESCUE" = "" ]; then
       echo "/run/dhcpcd-${MYDEV}.pid"
     elif [ -s /run/dhcpcd-${MYDEV}-4.pid ]; then
       echo "/run/dhcpcd-${MYDEV}-4.pid"
+    elif [ -s /run/${MYDEV}.pid ]; then
+      echo "/run/${MYDEV}.pid"
     else
       echo UNKNOWNLOC
     fi
@@ -1463,7 +1465,7 @@ if [ "$RESCUE" = "" ]; then
 
         # Let Slackware mount the unlocked container:
         luksfs=$(blkid /dev/mapper/$luksnam |rev |cut -d'"' -f2 |rev)
-        if ! grep -q /dev/mapper/$luksnam /mnt/overlay/etc/fstab ; then
+        if ! grep -q "^/dev/mapper/$luksnam" /mnt/overlay/etc/fstab ; then
           echo "/dev/mapper/$luksnam  $luksmnt  $luksfs  defaults  1  1" >> /mnt/overlay/etc/fstab
         fi
         # On shutdown, ensure that the container gets locked again:
@@ -1653,7 +1655,7 @@ EOPW
         mkdir -p /mnt/overlay/run/dhcpcd
         mount --bind /run/dhcpcd /mnt/overlay/run/dhcpcd
       fi
-      cp -a /run/dhcpcd* /mnt/overlay/run/
+      cp -a /run/dhcpcd* /run/${INTERFACE}.pid /mnt/overlay/run/
       cat /etc/resolv.conf > /mnt/overlay/etc/resolv.conf
 
       # Disable NetworkManager:
@@ -1807,7 +1809,7 @@ EOT
   done
   if [ $RUN_DEPMOD -eq 1 ]; then
     # This costs a few seconds in additional boot-up time unfortunately:
-    echo "${MARKER}: Additional kernel module(s) found... need a bit"
+    echo "${MARKER}:  Additional kernel module(s) found... need a bit"
     chroot /mnt/overlay /sbin/depmod -a
   fi
   unset RUN_DEPMOD
@@ -1818,11 +1820,14 @@ EOT
   # In case of network boot, do not kill the network, umount NFS prematurely
   #  or stop udevd on shutdown:
   if [ -n "$NFSHOST" ]; then
-    sed -i /mnt/overlay/etc/rc.d/rc.0 \
-      -e "/on \/ type nfs/s%grep -q 'on / type nfs'%egrep -q 'on / type (nfs|tmpfs)'%" \
-      -e '/umount.*nfs/s/nfs,//' \
-      -e 's/rc.udev force-stop/rc.udev stop/' \
-      -e 's/$(pgrep mdmon)/& $(pgrep udevd)/'
+    for RUNLVL in 0 6 ; do 
+      sed -i /mnt/overlay/etc/rc.d/rc.${RUNLVL} \
+        -e "/on \/ type nfs/s%grep -q 'on / type nfs'%egrep -q 'on / type (nfs|tmpfs)'%" \
+        -e "s%'on / type nfs4'%& -e 'on / type overlay'%" \
+        -e '/umount.*nfs/s/nfs,//' \
+        -e 's/rc.udev force-stop/rc.udev stop/' \
+        -e 's/$(pgrep mdmon)/& $(pgrep udevd)/'
+    done
   fi
 
   # Copy contents of rootcopy directory (may be empty) to overlay:
@@ -1859,8 +1864,8 @@ fi
 /sbin/udevadm control --exit
 
 unset ERR
-umount /proc
-umount /sys
+umount /proc 2>/dev/null
+umount /sys 2>/dev/null
 umount /run 2>/dev/null
 
 echo "${MARKER}:  Slackware Live system is ready."
