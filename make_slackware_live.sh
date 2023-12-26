@@ -131,6 +131,30 @@ NVUIDNR=${NVUIDNR:-"365"}
 NVGRP=${NVFRP:-"nvidia"}
 NVGRPNR=${NVUIDNR:-"365"}
 
+# The colord account:
+CLRUID=${CLRUID:-"colord"}
+CLRUIDNR=${CLRUIDNR:-"303"}
+CLRGRP=${CLRGRP:-"colord"}
+CLRGRPNR=${CLRUIDNR:-"303"}
+
+# The avahi account:
+AVUID=${AVUID:-"avahi"}
+AVUIDNR=${AVUIDNR:-"214"}
+AVGRP=${AVGRP:-"avahi"}
+AVGRPNR=${AVUIDNR:-"214"}
+
+# The flatpak account:
+FPUID=${FPUID:-"flatpak"}
+FPUIDNR=${FPUIDNR:-"372"}
+FPGRP=${FPGRP:-"flatpak"}
+FPGRPNR=${FPUIDNR:-"372"}
+
+# The tss account:
+TSUID=${TSUID:-"tss"}
+TSUIDNR=${TSUIDNR:-"374"}
+TSGRP=${TSGRP:-"tss"}
+TSGRPNR=${TSUIDNR:-"374"}
+
 # Custom name for the host:
 LIVE_HOSTNAME=${LIVE_HOSTNAME:-"darkstar"}
 
@@ -150,7 +174,7 @@ WAIT=${WAIT:-"5"}
 #
 
 # Who built the live image:
-BUILDER=${BUILDER:-"Alien BOB"}
+BUILDER=${BUILDER:-"GFS Team/mac-a-r0ni"}
 
 # Console font to use with syslinux for better language support:
 CONSFONT=${CONSFONT:-"ter-i16v.psf"}
@@ -193,7 +217,7 @@ SL_ARCH=${SL_ARCH:-"x86_64"}
 # Root directory of a Slackware local mirror tree;
 # You can define custom repository location (must be in local filesystem)
 # for any module in the file ./pkglists/<module>.conf:
-SL_REPO=${SL_REPO:-"/var/cache/liveslak/Slackware"}
+SL_REPO=${SL_REPO:-"/home/liveslak-gfs45"}
 DEF_SL_REPO=${SL_REPO}
 
 # The rsync URI of our default Slackware mirror server:
@@ -205,8 +229,8 @@ if [ "$(echo ${SL_VERSION}|cut -d. -f1)" == "14" ]; then
   # Slackware up and until 14.2 has KDE4 which includes the 'kdei' package set:
   SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,kdei,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
 else
-  # Exclude Emacs to keep the ISO size below DVD size:
-  SEQ_SLACKWARE="tagfile:a,ap,d,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
+  # Exclude kde,xfce & many xap to keep the ISO size below DVD size:
+  SEQ_SLACKWARE="tagfile:a,ap,d,l,n,tcl,x,xap,y,gnome pkglist:slackextra,slackpkgplus"
 fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
@@ -244,7 +268,7 @@ SEQ_STUDW="tagfile:a,ap,d,e,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra,sl
 # Package blacklists for variants:
 #BLACKLIST_DAW="seamonkey"
 #BLACKLIST_LEAN="seamonkey"
-BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars seamonkey"
+BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars joe seamonkey glade nmap xterm pan rxvt-unicode MPlayer libdbusmenu-qt polkit-qt qt5 qt5-webkit qtkeychain hplip xsane"
 #BLACKLIST_XFCE="gst-plugins-bad-free lynx mc motif mozilla-firefox pidgin xlockmore"
 
 # Potentially we will use package(s) from 'testing' instead of regular repo:
@@ -255,7 +279,7 @@ TESTINGLIST_DAW=""
 # List of kernel modules required for a live medium to boot properly;
 # Lots of HID modules added to support keyboard input for LUKS password entry;
 # Virtio modules added to experiment with liveslak in a VM.
-KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
+KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:hp_wmi:asus_wmi:virtio_net:wl:kvm:vhost-net"}
 
 # Network kernel modules to include for NFS root support:
 NETMODS="kernel/drivers/net kernel/drivers/virtio"
@@ -319,10 +343,10 @@ SQ_COMP=${SQ_COMP:-"xz"}
 LIVE_ROOTDIR=${LIVE_ROOTDIR:-"/mnt/slackwarelive"}
 
 # Directory where the live ISO image will be written:
-OUTPUT=${OUTPUT:-"/tmp"}
+OUTPUT=${OUTPUT:-"/home/liveslak-gfs45"}
 
 # Directory where we create the staging directory:
-TMP=${TMP:-"/tmp"}
+TMP=${TMP:-"/home/liveslak-gfs45"}
 
 # Toplevel directory of our staging area (this needs sufficient storage):
 LIVE_STAGING=${LIVE_STAGING:-"${TMP}/slackwarelive_staging"}
@@ -1916,11 +1940,22 @@ if ! echo "root:${ROOTPW}" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null; 
   echo "root:${ROOTPW}" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
 fi
 
-# Create group and user for the nvidia persistence daemon:
+# Create group and user for the avahi/colord/nvidia persistence daemon:
 if ! chroot ${LIVE_ROOTDIR} /usr/bin/getent passwd ${NVUID} > /dev/null 2>&1 ;
 then
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${AVGRPNR} ${AVGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "Avahi User" -u ${AVUIDNR} -g ${AVGRPNR} -d /dev/null -s /bin/false ${AVUID}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${CLRGRPNR} ${CLRGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${CLRUIDNR} -g ${CLRGRPNR} -d /var/lib/${CLRGRP} -s /bin/false ${CLRUID}
   chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${NVGRPNR} ${NVGRP}
   chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "Nvidia persistence" -u ${NVUIDNR} -g ${NVGRPNR} -d /dev/null -s /bin/false ${NVUID}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${FPGRPNR} ${FPGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${FPUIDNR} -g ${FPGRPNR} -d /var/lib/${FPGRP} -s /bin/false ${FPUID}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${TSGRPNR} ${TSGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "TSS/TPM Agent" -u ${TSUIDNR} -g ${TSGRPNR} -d /dev/null -s /sbin/nologin ${TSUID}
+
+#  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${TSUIDNR} -g ${TSGRPNR} -d /home/${TSGRP} -s /bin/bash ${TSUID}
+
   if ! echo "${NVUID}:$(openssl rand -base64 12)" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null ; then
     echo "${NVUID}:$(openssl rand -base64 12)" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
   fi
@@ -2086,8 +2121,7 @@ fi
 sed -e "s/^ *\([^#]\)/#\1/" -i ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
 # Enable a Slackware mirror for slackpkg:
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
-#http://mirrors.slackware.com/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
-http://ftp.osuosl.org/.2/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
+http://slackware.uk/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
 EOT
 
 ## Blacklist the l10n packages;
@@ -2116,13 +2150,12 @@ ALLOW32BIT=off
 USEBL=1
 WGETOPTS="--timeout=20 --tries=2"
 GREYLIST=on
-PKGS_PRIORITY=( restricted alienbob ktown mate )
-REPOPLUS=( slackpkgplus restricted alienbob ktown mate )
-MIRRORPLUS['slackpkgplus']=https://slackware.nl/slackpkgplus/
-MIRRORPLUS['restricted']=http://slackware.nl/people/alien/restricted_sbrepos/${SL_VERSION}/${SL_ARCH}/
-MIRRORPLUS['alienbob']=http://slackware.nl/people/alien/sbrepos/${SL_VERSION}/${SL_ARCH}/
-MIRRORPLUS['mate']=http://slackware.uk/msb/${SL_VERSION}/latest/${SL_ARCH}/ 
-#MIRRORPLUS['studioware']=http://slackware.uk/studioware/${SL_VERSION}/ 
+STRICTGPG=on
+SEARCH_CLOG_INPARENT=on
+PKGS_PRIORITY=( gnome slackware64 )
+REPOPLUS=( gnome slackpkgplus )
+MIRRORPLUS['slackpkgplus']=http://slakfinder.org/slackpkg+/
+MIRRORPLUS['gnome']=https://reddoglinux.ddns.net/linux/gnome/45.x/x86_64/
 EOPL
   # Use the appropriate ktown variant:
   eval $( grep "^ *VARIANT=" ${LIVE_TOOLDIR}/pkglists/ktown.conf)
@@ -2131,10 +2164,31 @@ EOPL
 #MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
 MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
 EOPL
-  else
-    cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
-#MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
-MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
+fi
+
+# add slackpkg+ blacklist for gnome ensuring we don't end up install-new-ing kde & xfce package sets
+# and/or the kernel packages
+if [ -f var/log/packages/slackpkg+-* ] ; then
+  cat <<EOPL > etc/slackpkg/greylist
+cairo.*
+gjs.*
+gnome-keyring.*
+libgtop.*
+libhandy.*
+librsvg.*
+EOPL
+  fi
+if [ -f var/log/packages/slackpkg+-* ] ; then
+  cat <<EOPL > etc/slackpkg/blacklist
+at-spi2-atk.*
+cairomm1.*
+glibmm2.*
+gtkmm4.*
+mm-common.*
+kernel-source.*
+pangomm2.*
+kde/
+xfce/
 EOPL
   fi
 fi
@@ -2408,14 +2462,14 @@ chmod 0644 ${LIVE_ROOTDIR}/etc/profile.d/dialog.{c,}sh
 mkdir -p ${LIVE_ROOTDIR}/usr/share/pixmaps
 install -m 0644 ${LIVE_TOOLDIR}/media/slackware/icons/graySW_512px.png \
   ${LIVE_ROOTDIR}/usr/share/pixmaps/liveslak.png
-mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop
-cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/.directory
-[Desktop Entry]
-Encoding=UTF-8
-Icon=user-desktop
-Type=Directory
-EOT
-cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/setup2hd.desktop
+#mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop
+#cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/.directory
+#[Desktop Entry]
+#Encoding=UTF-8
+#Icon=user-desktop
+#Type=Directory
+#EOT
+cat <<EOT > ${LIVE_ROOTDIR}/usr/share/applications/setup2hd.desktop
 #!/usr/bin/env xdg-open
 [Desktop Entry]
 Type=Application
@@ -2426,14 +2480,14 @@ Icon=/usr/share/pixmaps/liveslak.png
 Exec=sudo -i /usr/local/sbin/setup2hd
 EOT
 # Let Plasma5 trust the desktop shortcut:
-chmod 0544 ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/setup2hd.desktop
+chmod 0544 ${LIVE_ROOTDIR}/usr/share/applications/setup2hd.desktop
 
 
 # -------------------------------------------------------------------------- #
-echo "-- Configuring XFCE."
+echo "-- Configuring GNOME."
 # -------------------------------------------------------------------------- #
 
-# Prepare some XFCE defaults for the 'live' user and any new users.
+# Prepare some GNOME defaults for the 'live' user and any new users.
 # (don't show icons on the desktop for irrelevant stuff).
 # Also, allow other people to add their own custom skel*.txz archives:
 mkdir -p ${LIVE_ROOTDIR}/etc/skel/
@@ -3181,6 +3235,8 @@ elif [ "$LIVEDE" = "CINNAMON" ]; then
   ln -sf xinitrc.cinnamon-session ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
 elif [ "$LIVEDE" = "DLACK" ]; then
   ln -sf xinitrc.gnome ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
+elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.gnome ]; then
+  ln -sf xinitrc.gnome ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
 elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.kde ]; then
   ln -sf xinitrc.kde ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
 elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.xfce ]; then
@@ -3204,6 +3260,9 @@ if [ -x ${LIVE_ROOTDIR}/usr/sbin/cupsd ] && [ -f ${LIVE_ROOTDIR}/etc/rc.d/rc.cup
 fi
 if [ -x ${LIVE_ROOTDIR}/usr/sbin/cupsd ] && [ -f ${LIVE_ROOTDIR}/etc/rc.d/rc.cups-browsed ]; then
   chmod +x ${LIVE_ROOTDIR}/etc/rc.d/rc.cups-browsed
+fi
+if [ -x ${LIVE_ROOTDIR}/usr/bin/virsh ] && [ -f ${LIVE_ROOTDIR}/etc/rc.d/rc.libvirt ]; then
+  chmod +x ${LIVE_ROOTDIR}/etc/rc.d/rc.libvirt
 fi
 
 # Add a softvol pre-amp to ALSA - some computers have too low volumes.
@@ -3321,6 +3380,18 @@ if [ -x /usr/bin/nvidia-modprobe ]; then
   /usr/bin/nvidia-modprobe -c 0 -u
 fi
 
+# Start avahi daemon:
+if [ -x /etc/rc.d/rc.avahidaemon ]; then
+  echo "Starting Avahi Daemon..."
+  /etc/rc.d/rc.avahidaemon start
+fi
+
+# Start avahidnsconfd:
+if [ -x /etc/rc.d/rc.avahidnsconfd ]; then
+  echo "Starting Avahi DNS Confd..."
+  /etc/rc.d/rc.avahidnsconfd start
+fi
+
 # Start the nvidia-persistenced daemon:
 if  [ -x /etc/rc.d/rc.nvidia-persistenced ] && [ -d /var/run/nvidia-persistenced ]; then
   echo "Starting nvidia persistence daemon..."
@@ -3331,6 +3402,18 @@ fi
 EOT
 
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/rc.d/rc.local_shutdown
+
+# Stop avahidnsconfd
+if [ -x /etc/rc.d/rc.avahidnsconfd ]; then
+  echo "Stopping Avahi DNS Confd..."
+  /etc/rc.d/rc.avahidnsconfd stop
+fi
+
+# Stop avahidaemon
+if [ -x /etc/rc.d/rc.avahidaemon ]; then
+  echo "Stopping Avahi Daemon..."
+  /etc/rc.d/rc.avahidaemon stop
+fi
 
 # Stop the nvidia-persistenced daemon:
 if  [ -x /etc/rc.d/rc.nvidia-persistenced ]; then
