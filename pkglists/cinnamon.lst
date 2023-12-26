@@ -32,6 +32,7 @@ libsass
 metacity
 mint-cursor-themes
 mint-themes
+mint-l-icons
 mint-y-icons
 mint-y-theme
 mozjs
@@ -49,11 +50,13 @@ pygobject3-python3
 python-pam
 python3
 python3-xapp
+python3-webencodings
 pytz
 sassc
 setproctitle
 speex
 tinycss
+tinycss2
 vala
 xapp
 xapps

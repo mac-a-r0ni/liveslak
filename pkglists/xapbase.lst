@@ -23,7 +23,8 @@ gucharmap
 gv
 hexchat
 imagemagick
-jansson
+# Needed in Core OS, moved to noxbase:
+#jansson
 libcue
 libgnt
 libnice

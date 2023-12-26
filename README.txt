@@ -33,12 +33,12 @@ The reasons I had for creating the Slackware Live Edition are as follows:
 
 
 The "liveslak" scripts can generate a variety of Slackware flavors:
-  - a complete 64bit Slackware-current Live Edition (in a 4.4 GB ISO);
-  - a slimmed-down XFCE ISO (1000 MB) with XDM as the graphical login manager.  It fits on a 1 GB USB stick;
-  - a LEAN ISO (2.2 GB) of Slackware-current with reduced package set and based on Plasma5 Desktop;
+  - a complete 64bit Slackware-current Live Edition (in a 4.5 GB ISO);
+  - a slimmed-down XFCE ISO (1100 MB) with XDM as the graphical login manager.  It fits on a 1 GB USB stick;
+  - a LEAN ISO (2.5 GB) of Slackware-current with reduced package set and based on Plasma5 Desktop;
   - A Digital Audio Workstation (DAW) based on a custom Slackware package set plus a basic Plasma5, containing a rich software collection for musicians, producers and live performance artists (3.6 GB).
-  - a Mate variant (3.8 GB) where KDE has been replaced by Mate (a Gnome 2 fork);
-  - a Cinnamon flavour (a fork of the Gnome 3 Shell replacing Slackware's KDE) in an ISO file of 3.7 GB;
+  - a Mate variant (4.2 GB) where KDE has been replaced by Mate (a Gnome 2 fork);
+  - a Cinnamon flavour (a fork of the Gnome 3 Shell replacing Slackware's KDE) in an ISO file of 4.2 GB;
   - a Dlackware variant, which is Gnome3 + PAM + systemd on top of Slackware and stripped of KDE (no longer developed after Slackware 14.2);
   - a StudioWare edition containing all the project's audio, video and photo editing software packages (no longer developed after Slackware 14.2);
   - a "Custom" variant which you can give your own name, its own package list and custom post-install configuration.
@@ -73,13 +73,14 @@ Slackware Live Edition deviates as little as possible from a regular Slackware b
 === BIOS boot ===
 
 
-Slackware Live Edition uses syslinux to boot the Linux kernel on BIOS computers. To be precise, the "isolinux" variant is installed to the ISO image and the "extlinux" variant is installed into the Linux partition of the USB Live version.
+Slackware Live Edition uses syslinux to boot the Linux kernel on BIOS computers. To be precise, the "isolinux" variant is installed to the ISO image and the "extlinux" variant is installed into the ext4-formatted Linux partition of the USB Live version.
 
 Syslinux shows a graphical boot menu with a nice Slackware-themed background and several options:
   * Start (SLACKWARE | XFCE | MATE | CINNAMON | DAW | LEAN) Live (depending on which of the ISOs you boot)
   * Non-US Keyboard selection
   * Non-US Language selection
   * Memory test with memtest86+
+  * Console OS in RAM
 
 You can select a keyboard mapping that matches your computer's.  Also you can boot Slackware in another language than US English.
 If you stick to US English interface language you will probably still want to change the timezone because it will default to UTC.  You have to specify a custom timezone manually by adding "tz=YourGeography/YourLocation" because the syslinux bootmenu does not offer you a selection of timezones.  Syslinux allows you to edit the boot commandline by pressing <TAB>.  Press <ENTER> to boot after you made your changes or <ESC> to discard your edit and return to the menu.
@@ -96,8 +97,9 @@ On UEFI computers, Grub2 handles the boot and it will show a menu similar (and s
   * Non-US Timezone selection
   * Memory test with memtest86+
   * Help on boot parameters
+  * Console OS in RAM
 
-Editing a Grub menu before booting it is possible by pressing the "e" key.  After making your changes to the boot commandline, press <F10> to boot.  To discard your changes, press <ESC>.
+Editing a Grub menu before booting it is possible by pressing the "e" key.  After making your changes to the boot commandline, press <F10> or <Ctrl>-<x> to boot.  To discard your changes, press <ESC>.
 
 Another difference between Syslinux and Grub2 menus: in Grub2 you can select a non-US keyboard, language and/or timezone and you will return to the main menu every time.  You still have to select "Start SLACKWARE Live" to boot the computer.  In the Syslinux menu, only the keyboard selection menu will return you to the main menu.  Any non-US *language* selection on the other hand will boot you into Slackware Live immediately; without returning to the main menu.  This is a limitation of syslinux which would require exponentially more menu files to construct a menu with more choices.  Grub2 supports variables which make it easy to modify a menu entry's characteristics.
 
@@ -224,7 +226,7 @@ You might have noticed that the "-P" parameter does not accept a size parameter.
 
 An ISO companion script is available which enables you to add functionality in cases where you want to boot directly from an ISO file. For instance, when having added the ISO file as a selection in your Grub menu, or when using a 3rd-party boot manager like Ventoy.  Typically, a Live ISO is immutable (its ISO-9660 filesystem is read-only) and when you boot off it, the Live OS does not have persistence.  The system starts in a virgin state, every boot.
 
-The ISO companion script can add encrypted persistence and homedirectory container files to the disk partition which can be VFAT or EXFAT if you want.  It also can create a directory structure on-disk from which liveslak can load additional live modules that are not present inside the ISO (both 'addons' and 'optional').
+The ISO companion script can create encrypted containers for persistence and your homedirectory on the disk partition; that partition can be formatted as VFAT or EXFAT if you want.  It also can create a directory structure on-disk from which liveslak can load additional live modules that are not present inside the ISO (both 'addons' and 'optional').
 
 The script is called 'isocomp.sh', and it accepts the following parameters: <code>
   -d|--directory <path>         Create a liveslak directory structure to store
@@ -252,6 +254,9 @@ The script is called 'isocomp.sh', and it accepts the following parameters: <cod
                                 - filename needs to end in '.icc'.
                                 Supported filesystems inside container:
                                 - btrfs,ext2,ext4,f2fs,jfs,xfs.
+  -F|--filesystem <fs>          Specify filesystem to create when formatting
+                                devices/containers. Defaults to 'ext4',
+                                Choices are btrfs,ext2,ext4,f2fs,jfs,xfs.
   -L|--lcsize <size|perc>       Size of LUKS encrypted /home ; value is the
                                 requested size of the container in kB, MB, GB,
                                 or as a percentage of free space
@@ -302,6 +307,7 @@ The "setup2hd" script supports regular Slackware network installations. In addit
 
 The 'setup2hd' program has some capabilities that the original Slackware 'setup' lacks:
   * It will launch fdisk/gdisk if you forgot to create Linux partitions in advance;
+  * It will optionally install a firewall for which the configuration is based on your answers to a few questions;
   * It will allow you to create a regular user account and set its password;
   * It will prompt you to set the root password in a graphical dialog.
 
@@ -316,6 +322,7 @@ Specifically, the script is able to:
   * Restore the backed-up kernel and modules if the new kernel is not working.
   * Add network support modules for PXE boot (if missing).
   * Increase (or decrease) USB wait time during boot.
+  * Extend the size of any of the encrypted containers on the USB Live stick, in case such a container is running out of storage space and there's still room on the USB disk partition for the expansion.
   * Replace the Live init script inside the initrd image with a new script that you supply.
   * Move current persistence data to a new squashfs module in 'addons' afther which the persistence store will be re-initialized.  The new module's name is time-stamped (/liveslak/addons/0099-slackware__customchanges-yymmddHHMMSS.sxz) so that this action can be repeated many times.
 
@@ -417,7 +424,7 @@ How to start the PXE server?
 
 When you boot the Live OS you can then start a script "pxeserver" from the console in runlevel 3 or from an X terminal in runlevel 4.  The script will gather all required information and if it is unable to figure something out by itself it will ask you.  If it is unable to figure out the wired network interface that it should use, you can add the name of your interface (for instance, eth1) as a single parameter to the script when you start it.
 
-The PXE server uses dnsmasq to offer DNS to the PXE clients. The dnsmasq program will enable its internal DHCP server capabilities if your LAN does not have its own DHCP server. Dnsmasq will also start a TFTP server which the PXE clients will connect to in order to retrieve the boot files (kernel and initrd).  The ''pxeserver'' script also starts a NFS server which will be used by the Live initrd to obtain the squashfs modules and boot the Live OS.  If your PXE server has multiple network interfaces, for instance a wireless interface which is connected to the outside world and a wired interface connected to another computer which will become a PXE client (or indeed connected to a switch with a whole bunch of prospective PXE clients behind that) then the PXE server will setup packet forwarding so that the PXE clients will be able to access the outside world through the wired interface and out to that other interface.
+The PXE server uses dnsmasq to offer DNS to the PXE clients. The dnsmasq program will enable its internal DHCP server capabilities if your LAN does not have its own DHCP server. Dnsmasq will also start a TFTP server which the PXE clients will connect to in order to retrieve the boot files (kernel and initrd).  The ''pxeserver'' script also starts a NFS server which will be used by the Live initrd to obtain the squashfs modules and boot the Live OS.  If your PXE server has multiple network interfaces, for instance a wireless interface which is connected to the outside world and a wired interface connected to another computer which will become a PXE client (or indeed connected to a switch with a whole bunch of prospective PXE clients behind that) then the PXE server will setup packet forwarding so that the PXE clients will be able to access the outside world through the wired interface and out to that other interface. If the PXE clients are unable to access the Internet using this default IP packet forwarding configuration, you may want to answer with 'YES' to the question during pxeserver's configuration when it asks you if you want to hide the PXE clients behind a NAT router.
 
 If you have multiple network interfaces, it is important to know that dnsmasq will only bind to the interface where you want PXE clients to connect to.  In a multi-NIC situation where a second NIC is connected to the outside world (your local network), this means that the DHCP/DNS server started by dnsmasq will not interfere with an existing DHCP server in your local network.
 
@@ -627,7 +634,7 @@ The USB variant with persistence may have an additional directory in the root:
 The first script:
 
 The script "make_slackware_live.sh" creates an ISO file as its output which contains the Live OS.
-Thanks to Linux kernel 4.x and the squashfs-tools package in Slackware, the process of creating a Slackware Live ISO requires **no** (re)compilation of Slackware content or installing 3rd party packages.
+Thanks to Linux kernel >= 4.x and the squashfs-tools package in Slackware, the process of creating a Slackware Live ISO requires **no** (re)compilation of Slackware content or installing 3rd party packages.
 
 The script's inner workings can be subdivided into several distinct stages.  For the full Slackware ISO the process stages are as follows:
 
@@ -657,7 +664,7 @@ Stage two:
     * 'root' and 'live' user accounts are created,
     * an initial environment for the accounts is configured,
     * the desktop environment is pre-configured for first use,
-    * the liveslak scripts "makemod", "iso2usb.sh", "isocomp.sh" and "upslak.sh" are copied to "/usr/local/sbin/" in the ISO for your convenience,
+    * the liveslak scripts "makemod", "iso2usb.sh", "isocomp.sh", "upslak.sh" and "pxeserver" are copied to "/usr/local/sbin/" in the ISO for your convenience,
     * The "setup2hd" script and the Slackware installer files are copied to "/usr/local/sbin" and "/usr/share/liveslak" respectively.
     * slackpkg is configured,
     * a locate database is created,
@@ -679,7 +686,7 @@ Stage three:
 
 Stage four:
 
-  * a bootable ISO file is created using mkisofs.
+  * a bootable ISO file is created using mkisofs or xorriso.
   * the "isohybrid" command is run on the ISO so that you can "dd" or "cp" the ISO to a USB stick and thus create a bootable USB media.
 
 Done! You can find the ISO file and its MD5 checksum in the /tmp directory.
@@ -700,7 +707,8 @@ The "iso2usb.sh" script wipes and re-partitions the USB stick unless the "-r" or
 
   * First partition: a small (1 MB in size) FAT partition which  is not used for Slackware Live Edition.  It can be used by an alternative bootloader if needed.  You can also store your LUKS keyfile on it to unlock a LUKS-encrypted Slackware Linux computer (see the README_CRYPT.TXT file on your Slackware DVD for more information on LUKS keyfiles).
   * Second partition: a 100 MB VFAT partition containing the kernel, initrd and all the other stuff required by syslinux and grub2 to boot Slackware Live Edition.
-  * Third partition: a Linux partition taking up all of the remaining space. It contains the actual liveslak modules, the persistent live storage and optionally your encrypted homedirectory. You can use the remainder of this Linux ext4 filesystem's free space to store anything you like.
+  * Third partition: a Linux partition which by default takes up all of the remaining space. It contains the actual liveslak modules, the persistent live storage and optionally your encrypted homedirectory. You can use the remainder of this Linux ext4 filesystem's free space to store anything you like.
+  * Fourth partition is optional: using the ''-y|--layout'' commandline parameter you can create a un-used partition at the end of the USB disk which is all yours to format and use. This layout parameter allows you to specify partition sizes.
 
 Note that this script extracts the ISO contents to transform a USB stick into into a persistent live OS. This is a destructive process, erasing all previously available content on that stick. Several 3rd party tools (like multibootusb, rufus, unetbootin) that claim to be able to mix several Live OS'es on a single USB stick and make them all work in a multi-boot setup, are not currently supporting liveslak. Ventoy on the other hand, is fully supported by liveslak and therefore your best bet if you don't want to wipe your data off your USB stick. As a bonus, the ''isocomp.sh'' script is able to add persistence to a liveslak ISO on a Ventoy boot disk. 
 
@@ -772,7 +780,7 @@ Usage:
 
   * The first parameter is either the full path to a Slackware package, or else a directory.
     * If a packagename is supplied as first parameter, it will be installed into a temporary directory using Slackware's "installpkg". The content of the temporary directory will be squashed into a module by the "squashfs" program.
-    * If a directoryname is supplied, its content will be squashed into a module by the "squashfs" program..
+    * If a directoryname is supplied, its content will be squashed into a module by the "squashfs" program.
   * The second parameter is the full pathname of the output module which will be created.
 
 You can copy the module you just created (minding the filename conventions for a Slackware Live module, see paragraph "Slackware Live module format") to either the optional/ or to the addon/ directory of your Live OS. If you copy it to the optional/ or addon/ directory of the liveslak sources then "make_slackware_live.sh" will use the module when creating the ISO image.
@@ -804,6 +812,7 @@ The ''pxeserver'' script works as follows:
     * dnsmasq providing DNS, DHCP and BOOTP;
     * NFS and RPC daemons;
   * The script will detect if you have an outside network connection on another interface and will enable IP forwarding if needed, so that the PXE clients will also have network access.
+  * The script can optionally setup NAT routing - masquerading the PXE clients from the outside world - if regular IP packet forwarding is not making the outside network accessible to PXE clients.
   * The Live OS booted via pxelinux is configured with additional boot parameters: <code>
 nfsroot=<server_ip_address>:/mnt/livemedia
 luksvol=

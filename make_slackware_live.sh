@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.8.0"
+VERSION="1.8.1"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -223,7 +223,7 @@ SEQ_DAW="pkglist:${MINLIST},noxbase,x_base,xapbase,slackpkgplus,z00_plasma5supp,
 
 # Slackware with 'ktown' Plasma5 instead of its own KDE (full install):
 # - each will become a squashfs module:
-SEQ_KTOWN="tagfile:a,ap,d,e,f,k,l,n,t,tcl,x,xap,xfce,y pkglist:ktown,ktownalien,slackextra,slackpkgplus"
+SEQ_KTOWN="tagfile:a,ap,d,f,k,l,n,t,tcl,x,xap,xfce,y pkglist:ktownslack,ktown,ktownalien,slackextra,slackpkgplus"
 
 # List of Slackware package series with MSB instead of KDE (full install):
 # - each will become a squashfs module:
@@ -270,7 +270,7 @@ NETFIRMWARE="3com acenic adaptec bnx tigon e100 sun kaweth tr_smctr cxgb3 rtl_ni
 # If any Live variant needs additional 'append' parameters, define them here,
 # either using a variable name 'KAPPEND_<LIVEDE>', or by defining 'KAPPEND' in the .conf file:
 KAPPEND_SLACKWARE=""
-KAPPEND_KTOWN="threadirqs"
+KAPPEND_KTOWN="threadirqs loglevel=3 audit=0"
 KAPPEND_DAW="threadirqs preempt=full loglevel=3 audit=0"
 KAPPEND_LEAN="threadirqs preempt=full loglevel=3 audit=0"
 KAPPEND_STUDIOWARE="threadirqs preempt=full loglevel=3 audit=0"
@@ -1006,8 +1006,8 @@ function secureboot() {
 
   if [ "${SHIM_VENDOR}" = "fedora" ]; then
     # The version of Fedora's shim package - always use the latest!
-    SHIM_MAJVER=15.4
-    SHIM_MINVER=5
+    SHIM_MAJVER=15.6
+    SHIM_MINVER=2
     SHIMSRC="https://kojipkgs.fedoraproject.org/packages/shim/${SHIM_MAJVER}/${SHIM_MINVER}/x86_64/shim-x64-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from Fedora."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1023,7 +1023,7 @@ function secureboot() {
     #  ${LIVE_STAGING}/EFI/BOOT/fbx64.efi
   elif [ "${SHIM_VENDOR}" = "opensuse" ]; then
     SHIM_MAJVER=15.4
-    SHIM_MINVER=4.2
+    SHIM_MINVER=6.1
     SHIMSRC="https://download.opensuse.org/repositories/openSUSE:/Factory/standard/x86_64/shim-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from openSUSE."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1038,10 +1038,10 @@ function secureboot() {
     #install -D -m0644 usr/share/efi/x86_64/fallback.efi \
     #  ${LIVE_STAGING}/EFI/BOOT/fallback.efi
   elif [ "${SHIM_VENDOR}" = "debian" ]; then
-    DEBSHIM_VER=1.38
+    DEBSHIM_VER=1.40
     DEBMOKM_VER=1
-    SHIM_MAJVER=15.4
-    SHIM_MINVER=7
+    SHIM_MAJVER=15.7
+    SHIM_MINVER=1
     SHIMSRC="http://ftp.de.debian.org/debian/pool/main/s/shim-signed/shim-signed_${DEBSHIM_VER}+${SHIM_MAJVER}-${SHIM_MINVER}_amd64.deb"
     MOKMSRC="http://ftp.de.debian.org/debian/pool/main/s/shim-helpers-amd64-signed/shim-helpers-amd64-signed_${DEBMOKM_VER}+${SHIM_MAJVER}+${SHIM_MINVER}_amd64.deb"
     echo "-- Downloading the SecureBoot signed shim from Debian."
@@ -2585,14 +2585,14 @@ EOT
 fi # End KDE4
 
 
-# Only configure for Plasma5 if it is actually installed:
-if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/kf5 ]; then
+# Only configure for KDE Plasma if it is actually installed:
+if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/libexec/kf5 ] || [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/libexec/kf6 ] ; then
 
   # -------------------------------------------------------------------------- #
-  echo "-- Configuring Plasma5."
+  echo "-- Configuring Plasma Desktop."
   # -------------------------------------------------------------------------- #
 
-  # This section is for any Plasma5 based variant.
+  # This section is for any Plasma based variant.
 
   # Install a custom login/desktop/lock background if an image is present:
   plasma5_custom_bg
@@ -2601,7 +2601,7 @@ if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/kf5 ]; then
   rm -f ${LIVE_ROOTDIR}/usr/share/xsessions/openbox-session.desktop || true
   # Remove the buggy mediacenter session:
   rm -f ${LIVE_ROOTDIR}/usr/share/xsessions/plasma-mediacenter.desktop || true
-  # Remove non-functional wayland session:
+  # Remove non-functional Qt5 wayland session:
   if [ ! -f ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/qt5/bin/qtwaylandscanner ];
   then
     rm -f ${LIVE_ROOTDIR}/usr/share/wayland-sessions/plasmawayland.desktop || true
@@ -2647,8 +2647,8 @@ EOT
 super-user-command=sudo
 KDESU_EOF
 
-  # For the above to work in KDE5 with newer versions of sudo (since 2022),
-  # we need the following also. KDE5 fixed this in git on 04-aug-2023, see
+  # For the above to work in Plasma with newer versions of sudo (since 2022),
+  # we need the following also. KDE fixed this in git on 04-aug-2023, see
   # https://bugs.kde.org/show_bug.cgi?id=452532 but it does not hurt to have
   # it here, and it helps to support older KDE releases:
   if [ -x ${LIVE_ROOTDIR}/usr/lib*/libexec/kf5/kdesu_stub ]; then
@@ -2721,8 +2721,9 @@ Zonetab=/usr/share/zoneinfo/zone.tab
 EOTZ
 
   # Make sure that Plasma and SDDM work on older GPUs,
-  # by forcing Qt5 to use software GL rendering:
-  cat <<"EOGL" >> ${LIVE_ROOTDIR}/usr/share/sddm/scripts/Xsetup
+  # by forcing Qt to use software GL rendering:
+  if ! grep -q QT_XCB_FORCE_SOFTWARE_OPENGL ${LIVE_ROOTDIR}/usr/share/sddm/scripts/Xsetup ; then
+    cat <<"EOGL" >> ${LIVE_ROOTDIR}/usr/share/sddm/scripts/Xsetup
 
 OPENGL_VERSION=$(LANG=C glxinfo |grep '^OpenGL version string: ' |head -n 1 |sed -e 's/^OpenGL version string: \([0-9]\).*$/\1/g')
 if [ "$OPENGL_VERSION" -lt 2 ]; then
@@ -2731,11 +2732,24 @@ if [ "$OPENGL_VERSION" -lt 2 ]; then
 fi
 
 EOGL
+  fi
+
+  # Make Wayland instead of X11 the default for SDDM;
+  # leave commented-out for now:
+  mkdir -p ${LIVE_ROOTDIR}/etc/sddm.conf.d
+  cat << EOW > ${LIVE_ROOTDIR}/etc/sddm.conf.d/plasma-wayland.conf
+#[General]
+#DisplayServer=wayland
+#GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+#
+#[Wayland]
+#CompositorCommand=kwin_wayland --drm --inputmethod qtvirtualkeyboard --no-global-shortcuts --no-lockscreen --locale1
+EOW
 
   # Workaround a bug where SDDM does not always use the configured keymap:
   echo "setxkbmap" >> ${LIVE_ROOTDIR}/usr/share/sddm/scripts/Xsetup
 
-  # Do not show the blueman applet, Plasma5 has its own BlueTooth widget:
+  # Do not show the blueman applet, Plasma has its own BlueTooth widget:
   echo "NotShowIn=KDE;" >> ${LIVE_ROOTDIR}/etc/xdg/autostart/blueman.desktop
 
   # Set QtWebkit as the Konqueror rendering engine if available:
@@ -2753,19 +2767,25 @@ EOT
   mkdir -p ${LIVE_ROOTDIR}/etc/profile.d
   cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/kwayland.sh
 #!/bin/sh
-# Force the usage of XCB platform on Qt5 applications:
+# Force the usage of XCB platform on Qt applications:
 export QT_QPA_PLATFORM=xcb
 # Force the usage of X11 platform for GDK applications:
 export GDK_BACKEND=x11
 EOT
   cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/kwayland.csh
 #!/bin/csh
-# Force the usage of XCB platform on Qt5 applications:
+# Force the usage of XCB platform on Qt applications:
 setenv QT_QPA_PLATFORM xcb
 # Force the usage of X11 platform for GDK applications:
 setenv GDK_BACKEND x11
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
+
+# Make pipewire the default, kill pulseaudio:
+if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
+  echo "-- Enabling pipewire"
+  chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
+fi
 
 # Ensure that color Emojis work in Qt applications:
 mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
@@ -2799,7 +2819,7 @@ EOT
     rm -rf ${LIVE_ROOTDIR}/usr/share/wayland-sessions
   fi
 
-fi # End Plasma5
+fi # End Plasma
 
 if [ "$LIVEDE" = "DLACK" ]; then
 

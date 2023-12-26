@@ -43,6 +43,23 @@ xlogin.Login.innerFramesWidth:	0
 xlogin.Login.sepWidth:		0
 xlogin.Login.logoFileName:	/etc/X11/xdm/liveslak-xdm/bluepiSW.xpm
 
+xlogin*login.translations: #override \
+	Ctrl<Key>R: abort-display()\n\
+	<Key>Delete: delete-character()\n\
+	<Key>Left: move-backward-character()\n\
+	<Key>Right: move-forward-character()\n\
+	<Key>Home: move-to-begining()\n\
+	<Key>End: move-to-end()\n\
+	Ctrl<Key>KP_Enter: set-session-argument(failsafe) finish-field()\n\
+	<Key>KP_Enter: set-session-argument() finish-field()\n\
+	Ctrl<Key>Return: set-session-argument(failsafe) finish-field()\n\
+	<Key>Return: set-session-argument() finish-field()
+	<Key>F1: set-session-argument(failsafe) finish-field()\n\
+	<Key>F2: set-session-argument(kde) finish-field()\n\
+	<Key>F3: set-session-argument(xfce) finish-field()\n\
+	<Key>F4: set-session-argument(fvwm2) finish-field()\n\
+	<Key>F5: set-session-argument(fluxbox) finish-field()\n\
+
 .XClock.geometry:		350x28+0-0
 .XClock.Clock.analog:		false
 .XClock.Clock.strftime:		(%A)\040%F\040%T

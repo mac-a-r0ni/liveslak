@@ -184,6 +184,7 @@ seamonkey-solibs-compat32
 slang-compat32
 speex-compat32
 speexdsp-compat32
+spirv-llvm-translator-compat32
 startup-notification-compat32
 svgalib-compat32
 taglib-compat32
