@@ -2164,7 +2164,7 @@ EOPL
   else
     cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
 #MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
-MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
+#MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
 EOPL
   fi
 fi
