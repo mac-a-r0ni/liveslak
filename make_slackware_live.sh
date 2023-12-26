@@ -3,6 +3,8 @@
 # Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL 
 # All rights reserved.
 #
+# Modifications for nwg-shell Copypasta 2023 Jay Lanagan, Detroit, MI, USA.
+#
 #   Permission to use, copy, modify, and distribute this software for
 #   any purpose with or without fee is hereby granted, provided that
 #   the above copyright notice and this permission notice appear in all
@@ -131,8 +133,14 @@ NVUIDNR=${NVUIDNR:-"365"}
 NVGRP=${NVFRP:-"nvidia"}
 NVGRPNR=${NVUIDNR:-"365"}
 
+# The greetd account:
+GRDUID=${GRDUID:-"greeter"}
+GRDUIDNR=${GRDUIDNR:-"380"}
+GRDGRP=${GRDGRP:-"greeter"}
+GRDGRPNR=${GRDUIDNR:-"380"}
+
 # Custom name for the host:
-LIVE_HOSTNAME=${LIVE_HOSTNAME:-"darkstar"}
+LIVE_HOSTNAME=${LIVE_HOSTNAME:-"nwgshell"}
 
 # What runlevel to use if adding a DE like: XFCE, DAW, KTOWN etc...
 RUNLEVEL=${RUNLEVEL:-4}
@@ -143,14 +151,14 @@ SYSMENU=${SYSMENU:-"YES"}
 # The amount of seconds we want the init script to wait to give the kernel's
 # USB subsystem time to settle. The default value of mkinitrd is "1" which
 # is too short for use with USB sticks but "1" is fine for CDROM/DVD.
-WAIT=${WAIT:-"5"}
+WAIT=${WAIT:-"10"}
 
 #
 # ---------------------------------------------------------------------------
 #
 
 # Who built the live image:
-BUILDER=${BUILDER:-"Alien BOB"}
+BUILDER=${BUILDER:-"jloc0/mac-a-r0ni"}
 
 # Console font to use with syslinux for better language support:
 CONSFONT=${CONSFONT:-"ter-i16v.psf"}
@@ -193,7 +201,7 @@ SL_ARCH=${SL_ARCH:-"x86_64"}
 # Root directory of a Slackware local mirror tree;
 # You can define custom repository location (must be in local filesystem)
 # for any module in the file ./pkglists/<module>.conf:
-SL_REPO=${SL_REPO:-"/var/cache/liveslak/Slackware"}
+SL_REPO=${SL_REPO:-"/home/liveslak-nwg"}
 DEF_SL_REPO=${SL_REPO}
 
 # The rsync URI of our default Slackware mirror server:
@@ -206,7 +214,7 @@ if [ "$(echo ${SL_VERSION}|cut -d. -f1)" == "14" ]; then
   SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,kdei,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
 else
   # Exclude Emacs to keep the ISO size below DVD size:
-  SEQ_SLACKWARE="tagfile:a,ap,d,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
+  SEQ_SLACKWARE="tagfile:a,ap,d,l,n,nwg,x,xap,xfce,y pkglist:slackextra,slackpkgplus"
 fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
@@ -244,7 +252,7 @@ SEQ_STUDW="tagfile:a,ap,d,e,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra,sl
 # Package blacklists for variants:
 #BLACKLIST_DAW="seamonkey"
 #BLACKLIST_LEAN="seamonkey"
-BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars seamonkey"
+BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars joe seamonkey"
 #BLACKLIST_XFCE="gst-plugins-bad-free lynx mc motif mozilla-firefox pidgin xlockmore"
 
 # Potentially we will use package(s) from 'testing' instead of regular repo:
@@ -319,10 +327,10 @@ SQ_COMP=${SQ_COMP:-"xz"}
 LIVE_ROOTDIR=${LIVE_ROOTDIR:-"/mnt/slackwarelive"}
 
 # Directory where the live ISO image will be written:
-OUTPUT=${OUTPUT:-"/tmp"}
+OUTPUT=${OUTPUT:-"/home/liveslak-nwg"}
 
 # Directory where we create the staging directory:
-TMP=${TMP:-"/tmp"}
+TMP=${TMP:-"/home/liveslak-nwg"}
 
 # Toplevel directory of our staging area (this needs sufficient storage):
 LIVE_STAGING=${LIVE_STAGING:-"${TMP}/slackwarelive_staging"}
@@ -1107,7 +1115,7 @@ function create_iso() {
 
   # Time to determine the output filename, now that we know all the variables
   # and ensured that the OUTPUT directory exists:
-  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}.iso"}
+  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}-nwg.iso"}
   if [ "$USEXORR" = "NO" ]; then
     mkisofs -o "${OUTFILE}" \
       -V "${MEDIALABEL}" \
@@ -1926,6 +1934,13 @@ then
   fi
 fi
 
+# Create group and user for the greetd session:
+if ! chroot ${LIVE_ROOTDIR} /usr/bin/getent passwd ${GRDUID} > /dev/null 2>&1 ;
+then
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${GRDGRPNR} ${GRDGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "greetd session greeter" -u ${GRDUIDNR} -g ${GRDGRPNR} -G video -d /dev/null -s /bin/false ${GRDUID}
+fi
+
 # Determine the full name of the live account in the image:
 if [ -z "${LIVEUIDFN}" ]; then
   eval LIVEUIDFN=\$LIVEUIDFN_${LIVEDE}
@@ -2082,12 +2097,24 @@ DEBUG_ETH_UP="no"
 EOT
 fi
 
+# Create blacklist for nwg-* packages in ponce repo;
+cat << EOT >> ${LIVE_ROOTDIR}/etc/sboui/blacklist
+
+# Blacklist nwg-shell and newly added packages;
+[0-9]_nwg
+fltk
+libhandy
+libime
+lua
+rdfind
+
+EOT
+
 # First disable any potentially incorrect mirror for slackpkg:
 sed -e "s/^ *\([^#]\)/#\1/" -i ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
 # Enable a Slackware mirror for slackpkg:
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
-#http://mirrors.slackware.com/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
-http://ftp.osuosl.org/.2/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
+http://slackware.uk/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
 EOT
 
 ## Blacklist the l10n packages;
@@ -2115,21 +2142,24 @@ VERBOSE=1
 ALLOW32BIT=off
 USEBL=1
 WGETOPTS="--timeout=20 --tries=2"
-GREYLIST=on
-PKGS_PRIORITY=( restricted alienbob ktown mate )
-REPOPLUS=( slackpkgplus restricted alienbob ktown mate )
-MIRRORPLUS['slackpkgplus']=https://slackware.nl/slackpkgplus/
-MIRRORPLUS['restricted']=http://slackware.nl/people/alien/restricted_sbrepos/${SL_VERSION}/${SL_ARCH}/
-MIRRORPLUS['alienbob']=http://slackware.nl/people/alien/sbrepos/${SL_VERSION}/${SL_ARCH}/
-MIRRORPLUS['mate']=http://slackware.uk/msb/${SL_VERSION}/latest/${SL_ARCH}/ 
-#MIRRORPLUS['studioware']=http://slackware.uk/studioware/${SL_VERSION}/ 
+GREYLIST=off
+STRICTGPG=on
+SEARCH_CLOG_INPARENT=on
+PKGS_PRIORITY=( slackware64 nwg-shell )
+REPOPLUS=( slackpkgplus nwg-shell )
+MIRRORPLUS['slackpkgplus']=http://slakfinder.org/slackpkg+/
+MIRRORPLUS['nwg-shell']=https://slackware.lngn.net/pub/x86_64/slackware64-current/nwg-shell/
 EOPL
-  # Use the appropriate ktown variant:
-  eval $( grep "^ *VARIANT=" ${LIVE_TOOLDIR}/pkglists/ktown.conf)
-  if [ "$VARIANT" = "testing" ]; then
-    cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
-#MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
-MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
+
+# add slackpkg+ blacklist ensuring we don't end up install-new-ing kde package sets
+# and/or the kernel packages
+if [ -f var/log/packages/slackpkg+-* ] ; then
+  cat <<EOPL > etc/slackpkg/blacklist
+kernel-generic.*
+kernel-huge.*
+kernel-modules.*
+kernel-source.*
+kde/
 EOPL
   else
     cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
@@ -2408,15 +2438,16 @@ chmod 0644 ${LIVE_ROOTDIR}/etc/profile.d/dialog.{c,}sh
 mkdir -p ${LIVE_ROOTDIR}/usr/share/pixmaps
 install -m 0644 ${LIVE_TOOLDIR}/media/slackware/icons/graySW_512px.png \
   ${LIVE_ROOTDIR}/usr/share/pixmaps/liveslak.png
-mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop
-cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/.directory
-[Desktop Entry]
-Encoding=UTF-8
-Icon=user-desktop
-Type=Directory
-EOT
-cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/setup2hd.desktop
-#!/usr/bin/env xdg-open
+#mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop
+#cat <<EOT > ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/.directory
+#[Desktop Entry]
+#Encoding=UTF-8
+#Icon=user-desktop
+#Type=Directory
+#EOT
+#### changed xdg-open to foot
+cat <<EOT > ${LIVE_ROOTDIR}/usr/share/applications/setup2hd.desktop
+#!/usr/bin/env foot
 [Desktop Entry]
 Type=Application
 Terminal=true
@@ -2426,14 +2457,14 @@ Icon=/usr/share/pixmaps/liveslak.png
 Exec=sudo -i /usr/local/sbin/setup2hd
 EOT
 # Let Plasma5 trust the desktop shortcut:
-chmod 0544 ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop/setup2hd.desktop
+chmod 0544 ${LIVE_ROOTDIR}/usr/share/applications/setup2hd.desktop
 
 
 # -------------------------------------------------------------------------- #
-echo "-- Configuring XFCE."
+echo "-- Configuring NWG-SHELL."
 # -------------------------------------------------------------------------- #
 
-# Prepare some XFCE defaults for the 'live' user and any new users.
+# Prepare some NWG defaults for the 'live' user and any new users.
 # (don't show icons on the desktop for irrelevant stuff).
 # Also, allow other people to add their own custom skel*.txz archives:
 mkdir -p ${LIVE_ROOTDIR}/etc/skel/
@@ -2441,39 +2472,21 @@ for SKEL in ${LIVE_TOOLDIR}/skel/skel*.txz ; do
   tar -xf ${SKEL} -C ${LIVE_ROOTDIR}/etc/skel/
 done
 
-if [ "$LIVEDE" = "XFCE" ]; then
-  # Since the XFCE ISO no longer has xpdf, use Firefox as the PDF viewer
-  # if that is present:
-  mkdir -p ${LIVE_ROOTDIR}/etc/skel/.config
-  if [ -f ${LIVE_ROOTDIR}/usr/bin/firefox ]; then
-    cat << EOF > ${LIVE_ROOTDIR}/etc/skel/.config/mimeapps.list
-[Default Applications]
-application/pdf=mozilla-firefox.desktop
-EOF
-  else
-    # If firefox is not present, we hope that seamonkey is there;
-    # you won't have a PDF viewer in that case unfortunately, but you could
-    # download https://github.com/IsaacSchemm/pdf.js-seamonkey :
-    cat << EOF > ${LIVE_ROOTDIR}/etc/skel/.config/mimeapps.list
-[Default Applications]
-x-scheme-handler/http=seamonkey.desktop
-x-scheme-handler/https=seamonkey.desktop
-x-scheme-handler/ftp=seamonkey.desktop
-x-scheme-handler/chrome=seamonkey.desktop
-x-scheme-handler/mailto=seamonkey-mail.desktop
-text/html=seamonkey.desktop
+if [ "$LIVEDE" = "SLACKWARE" ]; then
+  # Set sane SDDM defaults on first boot (root-owned file):
+  mkdir -p ${LIVE_ROOTDIR}/var/lib/sddm
+  cat <<EOT > ${LIVE_ROOTDIR}/var/lib/sddm/state.conf 
+[Last]
+# Name of the last logged-in user.
+# This user will be preselected when the login screen appears
+User=${LIVEUID}
 
-[Added Associations]
-x-scheme-handler/http=xfce4-web-browser.desktop;seamonkey.desktop;
-x-scheme-handler/https=xfce4-web-browser.desktop;seamonkey.desktop;
-x-scheme-handler/ftp=seamonkey.desktop;
-x-scheme-handler/chrome=seamonkey.desktop;
-x-scheme-handler/mailto=seamonkey.desktop;
-text/html=seamonkey.desktop;
-EOF
-  fi
+# Name of the session for the last logged-in user.
+# This session will be preselected when the login screen appears.
+Session=/usr/share/wayland-sessions/hyprland.desktop
+EOT
+  chroot ${LIVE_ROOTDIR} chown -R sddm:sddm var/lib/sddm
 fi
-
 
 # Only configure for KDE4 if it is actually installed:
 if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/kde4/libexec ]; then
@@ -2768,23 +2781,27 @@ EOT
   cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/kwayland.sh
 #!/bin/sh
 # Force the usage of XCB platform on Qt applications:
-export QT_QPA_PLATFORM=xcb
+# orig "xcb"
+export QT_QPA_PLATFORM=wayland
 # Force the usage of X11 platform for GDK applications:
-export GDK_BACKEND=x11
+# orig "x11"
+export GDK_BACKEND=wayland
 EOT
   cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/kwayland.csh
 #!/bin/csh
 # Force the usage of XCB platform on Qt applications:
-setenv QT_QPA_PLATFORM xcb
+setenv QT_QPA_PLATFORM wayland
 # Force the usage of X11 platform for GDK applications:
-setenv GDK_BACKEND x11
+setenv GDK_BACKEND wayland
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
 
 # Make pipewire the default, kill pulseaudio:
-if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
-  echo "-- Enabling pipewire"
-  chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
+# hyprland or something has an issue with pipewire
+# Ill figure it out some other day
+if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-disable.sh ]; then
+  echo "-- DISabling pipewire"
+  chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-disable.sh
 fi
 
 # Ensure that color Emojis work in Qt applications:
