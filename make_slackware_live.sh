@@ -2431,6 +2431,21 @@ if (-x /usr/bin/Xdialog) then
   setenv XDIALOG_FORCE_AUTOSIZE 1
 endif
 EOT
+
+## If greetd is installed, set XDG_RUNTIME_DIR environment variable:    ##
+cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/greetd.sh
+#!/bin/sh
+if [ -x /usr/bin/greetd ]; then
+  export XDG_RUNTIME_DIR=/tmp
+fi
+EOT
+cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/greetd.csh
+#!/bin/csh
+if (-x /usr/bin/greetd) then
+  setenv XDG_RUNTIME_DIR /tmp
+endif
+EOT
+
 # Once we are certain this works, make the scripts executable:
 chmod 0644 ${LIVE_ROOTDIR}/etc/profile.d/dialog.{c,}sh
 
@@ -2474,6 +2489,7 @@ done
 
 if [ "$LIVEDE" = "SLACKWARE" ]; then
   # Set sane SDDM defaults on first boot (root-owned file):
+  mkdir -p ${LIVE_ROOTDIR}/var/lib/greetd
   mkdir -p ${LIVE_ROOTDIR}/var/lib/sddm
   cat <<EOT > ${LIVE_ROOTDIR}/var/lib/sddm/state.conf 
 [Last]
@@ -2486,6 +2502,7 @@ User=${LIVEUID}
 Session=/usr/share/wayland-sessions/hyprland.desktop
 EOT
   chroot ${LIVE_ROOTDIR} chown -R sddm:sddm var/lib/sddm
+  chroot ${LIVE_ROOTDIR} chown -R greeter:greeter var/lib/greetd
 fi
 
 # Only configure for KDE4 if it is actually installed:
