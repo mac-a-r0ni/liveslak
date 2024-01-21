@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.8.1"
+VERSION="1.8.1.1"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -84,9 +84,11 @@ MOKCERT=""
 # to be defined through the '-S' parameter:
 MOKPRIVKEY=""
 
-# Set to NO if you want to use the non-SMP kernel on 32bit Slackware.
-# note: unsupported option since Slackware enabled preemption in 5.14.15.
-SMP32=${SMP32:-"YES"}
+# Set to YES if you want to use a SMP-tagged kernel package
+# on 32bit Slackware 15.0 or earlier.
+# In 32bit Slackware > 15.0 all kernels support preemption and the '-smp'
+# tag has been removed.
+SMP32=${SMP32:-"NO"}
 
 # Include support for NFS root (PXE boot), will increase size of the initrd:
 NFSROOTSUP=${NFSROOTSUP:-"YES"}
@@ -1898,6 +1900,16 @@ none      /           tmpfs       defaults   1   1
 
 EOT
 
+# Pipewire 1.0.0 is capable of replacing pulseaudio and jack2:
+if chroot ${LIVE_ROOTDIR} /usr/bin/pkg-config libpipewire-0.3 --atleast-version=1
+then
+  # Make pipewire the default, kill pulseaudio:
+  if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
+    echo "-- Enabling pipewire"
+    chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
+  fi
+fi
+
 # Prevent loop devices (sxz modules) from appearing in filemanagers:
 mkdir -p ${LIVE_ROOTDIR}/etc/udev/rules.d
 cat <<EOL > ${LIVE_ROOTDIR}/etc/udev/rules.d/11-local.rules
@@ -2780,12 +2792,6 @@ setenv QT_QPA_PLATFORM xcb
 setenv GDK_BACKEND x11
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
-
-# Make pipewire the default, kill pulseaudio:
-if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
-  echo "-- Enabling pipewire"
-  chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
-fi
 
 # Ensure that color Emojis work in Qt applications:
 mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail

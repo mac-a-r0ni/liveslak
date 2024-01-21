@@ -600,13 +600,13 @@ if [ "$RESCUE" = "" ]; then
       mknod -m660 $lodev b 7 $(echo $lodev |sed 's%/dev/loop%%')
     fi
     echo "$lodev"
-  }
+  } # End find_loop()
 
   mod_base() {
     MY_MOD="$1"
 
     echo $(basename ${MY_MOD}) |rev |cut -d. -f2- |rev
-  }
+  } # End mod_base()
 
   find_mod() {
     MY_LOC="$1"
@@ -628,7 +628,7 @@ if [ "$RESCUE" = "" ]; then
         done
       ) | sort
     fi
-  }
+  } # End find_mod()
 
   find_modloc() {
     MY_LOC="$1"
@@ -646,7 +646,7 @@ if [ "$RESCUE" = "" ]; then
     fi
 
     echo "${MY_LOC}"
-  }
+  } # End find_modloc()
 
   load_modules() {
     # SUBSYS can be 'system', 'addons', 'optional', 'core2ram':
@@ -706,10 +706,10 @@ if [ "$RESCUE" = "" ]; then
         echo "${MARKER}:  '$SUBSYS' modules were not found. Trouble ahead..."
       fi
     fi
-  }
+  } # End load_modules()
 
   # Function input is a series of device node names. Return all block devices:
-  ret_blockdev () {
+  ret_blockdev() {
     local OUTPUT=""
     for IDEV in $* ; do
       if [ -e /sys/block/$(basename $IDEV) ]; then
@@ -719,10 +719,10 @@ if [ "$RESCUE" = "" ]; then
     done
     # Trim trailing space:
     echo $OUTPUT |cat
-  }
+  } # End ret_blockdev()
 
   # Function input is a series of device node names.  Return all partitions:
-  ret_partition () {
+  ret_partition() {
     local OUTPUT=""
     for IDEV in $* ; do
       if [ -e /sys/class/block/$(basename $IDEV)/partition ]; then
@@ -732,7 +732,7 @@ if [ "$RESCUE" = "" ]; then
     done
     # Trim trailing space:
     echo $OUTPUT |cat
-  }
+  } # End ret_partition()
 
   # Return device node of Ventoy partition if found:
   # Function input:
@@ -743,7 +743,7 @@ if [ "$RESCUE" = "" ]; then
   #    return the device node for the partition containing the ISO file;
   # 'diskuuid' request: return the UUID for the disk;
   # 'partnr' request: return the number of the partition containing the ISO;
-  ret_ventoy () {
+  ret_ventoy() {
     local VOSPARMS="$1"
     local VACTION="$2"
     local DISKSIZE=""
@@ -795,7 +795,38 @@ if [ "$RESCUE" = "" ]; then
         echo scandev
       fi
     fi
-  }
+  } # End ret_ventoy()
+
+  # Find partition on which a file resides:
+  # Function input:
+  # (param 1) Full path to the file we are looking for
+  # (param 2) Directory to mount the partition containing our file
+  # Use $(df $MYMNT |tail -1 |tr -s ' ' |cut -d' ' -f1) to find that partition,
+  # it will remain mounted on the provided mountpoint upon function return.
+  scan_part() {
+    local FILEPATH="$1"
+    local MYMNT="$2"
+    local ISOPART=""
+    local PARTFS=""
+    echo "${MARKER}:  Scanning for '$FILEPATH'..."
+    for ISOPART in $(ret_partition $(blkid |cut -d: -f1)) $(ret_blockdev $(blkid |cut -d: -f1)) ; do
+      PARTFS=$(blkid $ISOPART |rev |cut -d'"' -f2 |rev)
+      mount -t $PARTFS -o ro $ISOPART ${MYMNT}
+      if [ -f "${MYMNT}/${FILEPATH}" ]; then
+        # Found our file!
+        unset ISOPART
+        break
+      else
+        umount $ISOPART
+      fi
+    done
+    if [ -n "$ISOPART" ]; then
+      echo "${MARKER}:  Partition scan unable to find $(basename $FILEPATH), trouble ahead."
+      return 1
+    else
+      return 0
+    fi
+  } # End scan_part()
 
   ## End support functions ##
 
@@ -958,25 +989,12 @@ if [ "$RESCUE" = "" ]; then
         mkdir -p ${SUPERMNT}
         #
         if [ "$LIVEMEDIA" = "scandev" ]; then
-          # Scan partitions to find the one with the ISO and set LIVEMEDIA:
-          echo "${MARKER}:  Scanning for '$LIVEPATH'..."
-          for ISOPART in $(ret_partition $(blkid |cut -d: -f1)) $(ret_blockdev $(blkid |cut -d: -f1)) ; do
-            PARTFS=$(blkid $ISOPART |rev |cut -d'"' -f2 |rev)
-            # Abuse the $SUPERMNT a bit, we will actually use it later:
-            mount -t $PARTFS -o ro $ISOPART ${SUPERMNT}
-            if [ -f ${SUPERMNT}/${LIVEPATH} ]; then
-              # Found our ISO!
-              LIVEMEDIA=$ISOPART
-              umount $ISOPART
-              unset ISOPART
-              break
-            else
-              umount $ISOPART
-            fi
-          done
-          if [ -n "$ISOPART" ]; then
-            echo "${MARKER}:  Partition scan unable to find ISO, trouble ahead."
-          fi
+          # Scan partitions to find the one with the ISO and set LIVEMEDIA.
+          # Abuse the $SUPERMNT a bit, we will actually use it later.
+          # TODO: proper handling of scan_part return code.
+          scan_part ${LIVEPATH} ${SUPERMNT}
+          LIVEMEDIA="$(df ${SUPERMNT} 2>/dev/null |tail -1 |tr -s ' ' |cut -d' ' -f1)"
+          umount ${SUPERMNT}
         fi
         # At this point we know $LIVEMEDIA - either because the bootparameter
         # specified it or else because the 'scandev' found it for us.

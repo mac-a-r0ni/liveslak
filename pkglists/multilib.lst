@@ -47,6 +47,7 @@ libtool-compat32
 llvm-compat32
 opencl-headers-compat32
 # The L/ series:
+Imath-compat32
 Mako-compat32
 SDL2-compat32
 SDL2_gfx-compat32
@@ -149,6 +150,7 @@ libunistring-compat32
 libunwind-compat32
 liburing-compat32
 libusb-compat32
+libvisual-compat32
 libvorbis-compat32
 libvpx-compat32
 libwebp-compat32
@@ -159,9 +161,11 @@ lmdb-compat32
 lz4-compat32
 lzo-compat32
 mozilla-nss-compat32
+neon-compat32
 ncurses-compat32
 ocl-icd-compat32
 openal-soft-compat32
+opencv-compat32
 openexr-compat32
 openjpeg-compat32
 opus-compat32
@@ -174,6 +178,7 @@ polkit-compat32
 popt-compat32
 pulseaudio-compat32
 python-six-compat32
+qrencode-compat32
 qt-compat32
 qt5-compat32
 readline-compat32
@@ -198,6 +203,7 @@ woff2-compat32
 xxHash-compat32
 zlib-compat32
 zstd-compat32
+zxing-cpp-compat32
 # The N/ series:
 curl-compat32
 cyrus-sasl-compat32
@@ -207,6 +213,7 @@ libgcrypt-compat32
 libgpg-error-compat32
 libtirpc-compat32
 nettle-compat32
+nghttp2-compat32
 openldap-client-compat32
 openldap-compat32
 openssl-compat32
