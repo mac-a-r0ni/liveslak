@@ -1569,7 +1569,7 @@ else
 fi
 
 # Determine additional boot parameters to be added:
-if [ -z ${KAPPEND} ]; then
+if [ -z "${KAPPEND}" ]; then
   eval KAPPEND=\$KAPPEND_${LIVEDE}
 fi
 

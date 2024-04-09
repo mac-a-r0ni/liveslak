@@ -5,6 +5,7 @@ aaa_libraries
 aaa_terminfo
 acl
 attr
+avahi
 bash
 bin
 binutils
@@ -28,6 +29,7 @@ dialog
 diffutils
 dmidecode
 dnsmasq
+duktape
 e2fsprogs
 ed
 elilo
@@ -73,6 +75,7 @@ kmod
 krb5
 less
 libassuan
+libdaemon
 libedit
 libevent
 libgcrypt
@@ -102,6 +105,7 @@ mozjs60
 mozjs68
 mozjs78
 mozjs102
+mozjs115
 ##mpfr
 mtr
 nano

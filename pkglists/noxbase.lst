@@ -88,6 +88,7 @@ libnih
 libnl
 libnl3
 libnotify
+libnvme
 libogg
 libpcap
 libpciaccess
@@ -132,6 +133,7 @@ newt
 nfs-utils
 nghttp2
 nmap
+nss-mdns
 ntfs-3g
 nvme-cli
 openexr

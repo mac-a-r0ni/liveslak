@@ -24,6 +24,7 @@ cdrtools
 compositeproto
 cups
 cups-filters
+cxxopts
 damageproto
 dbus-python
 dejavu-fonts-ttf
@@ -63,6 +64,7 @@ fribidi
 fslsfonts
 fstobdf
 gcr
+gcr4
 gd
 gegl
 gexiv2
@@ -213,6 +215,7 @@ pycairo
 pygobject
 pygobject3
 pygtk
+python2-pycairo
 python-MarkupSafe
 python-distro
 qrencode
