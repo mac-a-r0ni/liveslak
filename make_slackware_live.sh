@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL 
+# Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024  Eric Hameleers, Eindhoven, NL 
 # All rights reserved.
 #
 #   Permission to use, copy, modify, and distribute this software for
@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.8.1.1"
+VERSION="1.8.1.2"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -346,6 +346,17 @@ LIVE_MOD_ADD=${LIVE_MOD_ADD:-"${LIVE_STAGING}/${LIVEMAIN}/addons"}
 LIVE_MOD_OPT=${LIVE_MOD_OPT:-"${LIVE_STAGING}/${LIVEMAIN}/optional"}
 LIVE_MOD_COS=${LIVE_MOD_COS:-"${LIVE_STAGING}/${LIVEMAIN}/core2ram"}
 
+#
+# ---------------------------------------------------------------------------
+#
+
+# Internal variables:
+if which magick 1>/dev/null 2>/dev/null ; then
+  MAGICK="magick"
+else
+  MAGICK=""
+fi
+
 # ---------------------------------------------------------------------------
 # Define some functions.
 # ---------------------------------------------------------------------------
@@ -358,9 +369,10 @@ function cleanup() {
   umount ${LIVE_ROOTDIR}/sys 2>${DBGOUT} || true
   umount ${LIVE_ROOTDIR}/proc 2>${DBGOUT} || true
   umount ${LIVE_ROOTDIR}/dev 2>${DBGOUT} || true
-  umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+  lsof -l -n -t ${LIVE_ROOTDIR} |xargs -r kill -KILL || true
+  umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
   # Need to umount the squashfs modules too:
-  umount ${LIVE_WORK}/*_$$ 2>${DBGOUT} || true
+  umount -R ${LIVE_WORK}/*_$$ 2>${DBGOUT} || true
 
   rmdir ${LIVE_ROOTDIR} 2>${DBGOUT}
   rmdir ${LIVE_WORK}/*_$$ 2>${DBGOUT}
@@ -370,6 +382,17 @@ function cleanup() {
 } # End of cleanup()
 
 trap 'echo "*** $0 FAILED at line $LINENO ***"; cleanup; exit 1' ERR INT TERM
+
+# Slackware since September 2024 no longer has a kernel-modules package,
+# nor kernel-huge; all modules are added to the kernel-generic package:
+function find_modulespackage() {
+  local MYDIR=$1
+  if ls ${MYDIR}/var/log/packages/kernel*modules* 1>/dev/null 2>/dev/null; then
+    echo modules
+  else
+    echo generic
+  fi
+} # End of find_modulespackage()
 
 # Uncompress the initrd based on the compression algorithm used:
 function uncompressfs() {
@@ -397,7 +420,8 @@ function full_pkgname() {
     #  fi
     #done
     #echo "$FL"
-    echo "$(find ${TOPDIR}/ -name "${PACK}-*.t?z" 2>/dev/null |grep -E "\<${PACK//+/\\+}-[^-]+-[^-]+-[^-]+.t?z" |head -1)"
+    # Return the file with the most recent timestamp:
+    echo "$(find ${TOPDIR}/ -name "${PACK}-*.t?z" -exec ls -t {} + 2>/dev/null |grep -E "\<${PACK//+/\\+}-[^-]+-[^-]+-[^-]+.t?z" |head -1)"
   else
     echo ""
   fi
@@ -1008,8 +1032,8 @@ function secureboot() {
 
   if [ "${SHIM_VENDOR}" = "fedora" ]; then
     # The version of Fedora's shim package - always use the latest!
-    SHIM_MAJVER=15.6
-    SHIM_MINVER=2
+    SHIM_MAJVER=15.8
+    SHIM_MINVER=3
     SHIMSRC="https://kojipkgs.fedoraproject.org/packages/shim/${SHIM_MAJVER}/${SHIM_MINVER}/x86_64/shim-x64-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from Fedora."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1025,7 +1049,7 @@ function secureboot() {
     #  ${LIVE_STAGING}/EFI/BOOT/fbx64.efi
   elif [ "${SHIM_VENDOR}" = "opensuse" ]; then
     SHIM_MAJVER=15.4
-    SHIM_MINVER=6.1
+    SHIM_MINVER=7.2
     SHIMSRC="https://download.opensuse.org/repositories/openSUSE:/Factory/standard/x86_64/shim-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from openSUSE."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1040,9 +1064,9 @@ function secureboot() {
     #install -D -m0644 usr/share/efi/x86_64/fallback.efi \
     #  ${LIVE_STAGING}/EFI/BOOT/fallback.efi
   elif [ "${SHIM_VENDOR}" = "debian" ]; then
-    DEBSHIM_VER=1.40
+    DEBSHIM_VER=1.44
     DEBMOKM_VER=1
-    SHIM_MAJVER=15.7
+    SHIM_MAJVER=15.8
     SHIM_MINVER=1
     SHIMSRC="http://ftp.de.debian.org/debian/pool/main/s/shim-signed/shim-signed_${DEBSHIM_VER}+${SHIM_MAJVER}-${SHIM_MINVER}_amd64.deb"
     MOKMSRC="http://ftp.de.debian.org/debian/pool/main/s/shim-helpers-amd64-signed/shim-helpers-amd64-signed_${DEBMOKM_VER}+${SHIM_MAJVER}+${SHIM_MINVER}_amd64.deb"
@@ -1193,36 +1217,36 @@ function plasma5_custom_bg() {
   echo "-- Configuring ${LIVEDE} custom background image."
   # First convert our image into a JPG in the liveslak directory:
   mkdir -p ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}
-  convert ${LIVE_TOOLDIR}/media/${LIVEDE,,}/bg/background.* ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg
+  ${MAGICK:-convert} ${LIVE_TOOLDIR}/media/${LIVEDE,,}/bg/background.* ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg
 
   # Create a Plasma5 desktop wallpaper set with a lowercase LIVEDE name:
   mkdir -p ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images
 
   # Create set of images for common aspect ratios like 16:9, 16:10 and 4:3:
   # Aspect Ratio 16:9 :
-  convert ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 1920x1080 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1920x1080.jpg
-  convert ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x2880 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/5120x2880.jpg
   # Aspect Ratio 16:10 :
-  convert  ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x - | \
-    convert - -geometry 1920x1200^ -gravity center -crop 1920x1200+0+0 \
+    ${MAGICK:-convert} - -geometry 1920x1200^ -gravity center -crop 1920x1200+0+0 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1920x1200.jpg
-  convert  ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x - | \
-    convert - -geometry 1280x800^ -gravity center -crop 1280x800+0+0 \
+    ${MAGICK:-convert} - -geometry 1280x800^ -gravity center -crop 1280x800+0+0 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1280x800.jpg
   # Aspect Ratio 4:3 :
-  convert  ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x - | \
-    convert - -geometry 1024x768^ -gravity center -crop 1024x768+0+0 \
+    ${MAGICK:-convert} - -geometry 1024x768^ -gravity center -crop 1024x768+0+0 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1024x768.jpg
 
   # Create the required wallpaper screenshot of 400x225 px (16:9 aspect ratio):
-  convert ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 400x225 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/screenshot.png
 
@@ -1604,7 +1628,7 @@ fi
 if [ "$FORCE" = "YES" ]; then
   echo "-- Removing old files and directories!"
   umount ${LIVE_ROOTDIR}/{proc,sys,dev} 2>${DBGOUT} || true
-  umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+  umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
   rm -rf ${LIVE_STAGING}/${LIVEMAIN} ${LIVE_WORK} ${LIVE_ROOTDIR}
 fi
 
@@ -1708,21 +1732,22 @@ for SPS in ${SL_SERIES} ; do
     echo "${THEDATE} (${BUILDER})" > ${INSTDIR}/${MARKER}
 
     echo "-- Installing the '${SPS}' series."
-    umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+    umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
     mount -t overlay -o lowerdir=${RODIRS},upperdir=${INSTDIR},workdir=${LIVE_OVLDIR} overlay ${LIVE_ROOTDIR}
 
     # Install the package series:
     install_pkgs ${SPS} ${LIVE_ROOTDIR} ${MTYPE}
-    umount ${LIVE_ROOTDIR} || true
+    umount -R ${LIVE_ROOTDIR} || true
 
     if [ "$SPS" = "a" -a "$CORE2RAM" = "NO" ] || [ "$SPS" = "${MINLIST}" ]; then
 
       # We need to take care of a few things first:
+      KPKGDET=$(find_modulespackage $INSTDIR)
       if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
-        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*modules* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*${KPKGDET}* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
         KVER=$(ls --indicator-style=none ${INSTDIR}/lib/modules/ |grep -v smp |head -1)
       else
-        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*modules* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*${KPKGDET}* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
         KVER=$(ls --indicator-style=none ${INSTDIR}/lib/modules/ |grep smp |head -1)
       fi
       if [ -z "$KVER" ]; then
@@ -1730,6 +1755,15 @@ for SPS in ${SL_SERIES} ; do
         cleanup
         exit 1
       else
+        # Do we use old style (vmlinuz-generic-$KGEN) or one of the new styles
+        # (vmlinuz-$KGEN-generic or vmlinux-$KGEN) kernel image name?
+        if [ -f ${INSTDIR}/boot/vmlinuz-${KGEN} ]; then
+           KIMGNAME_STYLE="NEW2"
+        elif [ -f ${INSTDIR}/boot/vmlinuz-${KGEN}-generic ]; then
+           KIMGNAME_STYLE="NEW1"
+        else
+           KIMGNAME_STYLE="OLD"
+        fi
         # Move the content of the /boot directory out of the minimal system,
         # this will be joined again using overlay:
         rm -rf ${LIVE_BOOT}/boot
@@ -1782,15 +1816,16 @@ mkdir -p ${INSTDIR}
 echo "-- Configuring the base system."
 # -------------------------------------------------------------------------- #
 
-umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
 mount -t overlay -o lowerdir=${RODIRS},upperdir=${INSTDIR},workdir=${LIVE_OVLDIR} overlay ${LIVE_ROOTDIR}
 
 # Determine the kernel version in the Live OS:
+KPKGDET=$(find_modulespackage $LIVE_ROOTDIR)
 if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep -v smp |head -1)
 else
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep smp |head -1)
 fi
 
@@ -2345,11 +2380,11 @@ else
   # Use the default Slackware blue 'S':
   FACE_ICON="${LIVE_TOOLDIR}/blueSW-64px.png"
 fi
-convert ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/home/${LIVEUID}/.face.icon
+${MAGICK:-convert} ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/home/${LIVEUID}/.face.icon
 chown --reference=${LIVE_ROOTDIR}/home/${LIVEUID} ${LIVE_ROOTDIR}/home/${LIVEUID}/.face.icon
 ( cd ${LIVE_ROOTDIR}/home/${LIVEUID}/ ; ln .face.icon .face )
 mkdir -p ${LIVE_ROOTDIR}/usr/share/apps/kdm/pics/users
-convert ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/usr/share/apps/kdm/pics/users/blues.icon
+${MAGICK:-convert} ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/usr/share/apps/kdm/pics/users/blues.icon
 
 # Give XDM a nicer look:
 mkdir -p ${LIVE_ROOTDIR}/etc/X11/xdm/liveslak-xdm
@@ -3359,6 +3394,10 @@ if [ -x ${LIVE_ROOTDIR}/etc/cron.daily/mlocate ]; then
 else
   LOCATE_BIN=slocate
 fi
+# Mlocate needs a mounted /proc in the chroot:
+if ! mount | grep -q 'on ${LIVE_ROOTDIR}/proc' ; then
+  mount --bind /proc ${LIVE_ROOTDIR}/proc
+fi
 chroot ${LIVE_ROOTDIR} /etc/cron.daily/${LOCATE_BIN} 2>${DBGOUT}
 
 # -----------------------------------------------------------------------------
@@ -3366,7 +3405,7 @@ chroot ${LIVE_ROOTDIR} /etc/cron.daily/${LOCATE_BIN} 2>${DBGOUT}
 # -----------------------------------------------------------------------------
 
 # Squash the configuration into its own module:
-umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
 mksquashfs ${INSTDIR} ${LIVE_MOD_SYS}/0099-${DISTRO}_zzzconf-${SL_VERSION}-${SL_ARCH}.sxz -noappend -comp ${SQ_COMP} ${SQ_COMP_PARAMS}
 rm -rf ${INSTDIR}/*
 
@@ -3386,7 +3425,7 @@ unset INSTDIR
 # -----------------------------------------------------------------------------
 
 echo "-- Preparing the system for live booting."
-umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
 mount -t overlay -o lowerdir=${RODIRS%:*},upperdir=${LIVE_BOOT},workdir=${LIVE_OVLDIR} overlay ${LIVE_ROOTDIR}
 
 mount --bind /proc ${LIVE_ROOTDIR}/proc
@@ -3394,11 +3433,12 @@ mount --bind /sys ${LIVE_ROOTDIR}/sys
 mount --bind /dev ${LIVE_ROOTDIR}/dev
 
 # Determine the installed kernel version:
+KPKGDET=$(find_modulespackage $LIVE_ROOTDIR)
 if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep -v smp |head -1)
 else
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep smp |head -1)
 fi
 
@@ -3495,8 +3535,11 @@ fi
 rm -rf ${LIVE_ROOTDIR}/boot/initrd-tree
 
 # ... and cleanup these mounts again:
+# Also, prevent a 'target is busy' error while unmounting.
+# because gpg-agent/keyboxd/scdaemon were activated and keep the mount open:
+lsof -l -n -t ${LIVE_ROOTDIR} |xargs -r kill -KILL
 umount ${LIVE_ROOTDIR}/{proc,sys,dev} || true
-umount ${LIVE_ROOTDIR} || true
+umount -R ${LIVE_ROOTDIR} || true
 # Paranoia:
 [ ! -z "${LIVE_BOOT}" ] && rm -rf ${LIVE_BOOT}/{etc,tmp,usr,var} 1>${DBGOUT} 2>${DBGOUT}
 
@@ -3504,7 +3547,13 @@ umount ${LIVE_ROOTDIR} || true
 # Note to self: syslinux does not 'see' files unless they are DOS 8.3 names?
 rm -rf ${LIVE_STAGING}/boot
 mkdir -p ${LIVE_STAGING}/boot
-cp -a ${LIVE_BOOT}/boot/vmlinuz-generic*-$KGEN ${LIVE_STAGING}/boot/generic
+if [ "${KIMGNAME_STYLE}" = "NEW2" ]; then
+  cp -a ${LIVE_BOOT}/boot/vmlinuz-${KGEN} ${LIVE_STAGING}/boot/generic
+elif [ "${KIMGNAME_STYLE}" = "NEW1" ]; then
+  cp -a ${LIVE_BOOT}/boot/vmlinuz-${KGEN}-generic ${LIVE_STAGING}/boot/generic
+else
+  cp -a ${LIVE_BOOT}/boot/vmlinuz-generic*-${KGEN} ${LIVE_STAGING}/boot/generic
+fi
 mv ${LIVE_BOOT}/boot/initrd_${KVER}.img ${LIVE_STAGING}/boot/initrd.img
 
 # Squash the boot directory into its own module:

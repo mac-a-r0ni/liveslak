@@ -36,9 +36,10 @@ xz-compat32
 # The AP/ series:
 cdparanoia-compat32
 cups-compat32
+cups-browsed-compat32
 cups-filters-compat32
 flac-compat32
-lm_sensors-compat
+lm_sensors-compat32
 mariadb-compat32
 mpg123-compat32
 sqlite-compat32
@@ -115,6 +116,7 @@ libcap-compat32
 libcdio-paranoia-compat32
 libclc-compat32
 libcroco-compat32
+libcupsfilters-compat32
 libdbusmenu-compat32
 libdeflate-compat32
 libdvdnav-compat32
@@ -138,6 +140,7 @@ libnss_nis-compat32
 libogg-compat32
 libpcap-compat32
 libpng-compat32
+libppd-compat32
 librsvg-compat32
 libsamplerate-compat32
 libsndfile-compat32

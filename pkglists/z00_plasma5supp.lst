@@ -7,11 +7,13 @@ PyQt5
 QScintilla
 QtAV
 accountsservice
+aom
 cdparanoia
 cfitsio
 cldr-emoji-annotation
 cryfs
 cryptopp
+dav1d
 daemon
 #djvulibre
 dotconf
@@ -63,6 +65,7 @@ id3lib
 #json-glib
 kdsoap
 libXcm
+libass
 libburn
 libdbusmenu-qt
 libdmtx
@@ -75,11 +78,13 @@ libkkc-data
 #libnice
 liboggz
 libpinyin
+libplacebo
 libqalculate
 libraw1394
 libsass
 #libseccomp
 libspectre
+libunibreak
 liburing
 libva-utils
 libvncserver
@@ -133,6 +138,7 @@ taglib-extras
 #vim
 #vim-gvim
 #vulkan-sdk
+wireplumber
 woff2
 xcb-util-cursor
 xcb-util-errors

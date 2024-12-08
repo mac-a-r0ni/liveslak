@@ -422,10 +422,15 @@ fi
 
 # Sometimes the devices need extra time to be available.
 # A root filesystem on USB is a good example of that.
-echo "${MARKER}:  Sleeping $WAIT seconds to give slow USB devices some time."
-sleep $WAIT
-# Fire at least one blkid:
-blkid 1>/dev/null 2>/dev/null
+# Actually we are going to retry a few times for as long as needed:
+for ITER in 1 2 3 4 5 6 ; do
+  echo "${MARKER}:  Sleeping $WAIT seconds to give slow USB devices some time."
+  sleep $WAIT
+  # Fire one blkid to probe for readiness:
+  blkid -p 1>/dev/null 2>/dev/null
+  [ $? -eq 0 ] && break
+  echo "${MARKER}:  No sign of life from USB device, you're on your own..."
+done
 
 if [ "$RESCUE" = "" ]; then 
   if [ $LOCALHD -eq 1 ]; then
@@ -656,7 +661,7 @@ if [ "$RESCUE" = "" ]; then
     SUBSYSSET="$(find_mod /mnt/media/${LIVEMAIN}/${SUBSYS}/) $(find_mod ${SUPERMNT}/${LIVESLAKROOT}/${LIVEMAIN}/${SUBSYS}/)"
     if [ "$SUBSYS" = "optional" ]; then
       # We need to load any core2ram modules first:
-      SUBSYSSET="$(find_mod /mnt/media/${LIVEMAIN}/core2ram/) $(find_mod ${SUPERMNT}/${LIVESLAKROOT}/${LIVEMAIN}/core2ram/ ${SUBSYSSET})"
+      SUBSYSSET="$(find_mod /mnt/media/${LIVEMAIN}/core2ram/) $(find_mod ${SUPERMNT}/${LIVESLAKROOT}/${LIVEMAIN}/core2ram/) ${SUBSYSSET}"
     fi
     for MODULE in ${SUBSYSSET} ; do
       # Strip path and extension from the modulename:

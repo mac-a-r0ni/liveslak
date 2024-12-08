@@ -98,6 +98,7 @@ libproxy
 libpsl
 libpthread-stubs
 libqmi
+libqrtr-glib
 libsamplerate
 libsndfile
 libssh
@@ -132,6 +133,7 @@ nettle
 newt
 nfs-utils
 nghttp2
+nghttp3
 nmap
 nss-mdns
 ntfs-3g
