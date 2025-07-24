@@ -6,7 +6,7 @@
  #
 +# This script installs the lilo boot loader.
 +# The kernel used will be whatever the symlink /boot/vmlinuz points to,
-+# and if /boot/initrd.gz exists, that will be installed as the initrd.
++# and if /boot/initrd-generic.img exists, that will be installed as the initrd.
 +#
 +
  TMP=/var/log/setup/tmp
@@ -111,11 +111,11 @@
   LNXP="$(echo $LNXP | cut -f 1 -d ' ' | sort)"
   if [ ! "$LNXP" = "" ]; then
 -  cat << EOF >> $T_PX/etc/lilo.conf
-+  if [ -r $T_PX/boot/initrd.gz ]; then
++  if [ -r $T_PX/boot/initrd-generic.img ]; then
 +   cat << EOF >> $T_PX/etc/lilo.conf
 +# Linux bootable partition config begins
 +image = $KERNEL
-+  initrd = /boot/initrd.gz
++  initrd = /boot/initrd-generic.img
 +  #root = $ROOT_DEVICE
 +  label = Linux
 +  read-only
@@ -138,7 +138,7 @@
  ARCHTYPE=i386
  if [ -r $T_PX/vmlinuz ]; then
    KERNEL=/vmlinuz
-+elif [ -r $T_PX/boot/vmlinuz-generic ] && [ -r $T_PX/boot/initrd.gz ]; then
++elif [ -r $T_PX/boot/vmlinuz-generic ] && [ -r $T_PX/boot/initrd-generic.img ]; then
 +  KERNEL=/boot/vmlinuz-generic
  elif [ -r $T_PX/boot/vmlinuz ]; then
    KERNEL=/boot/vmlinuz
@@ -183,11 +183,11 @@
      fi
      LABEL="$(cat $TMP/reply)"
 -    cat << EOF >> $TMP/lilo.conf
-+    if [ -r $T_PX/boot/initrd.gz ]; then
++    if [ -r $T_PX/boot/initrd-generic.img ]; then
 +     cat << EOF >> $TMP/lilo.conf
 +# Linux bootable partition config begins
 +image = $KERNEL
-+  initrd = /boot/initrd.gz
++  initrd = /boot/initrd-generic.img
 +  #root = $LINUX_PART
 +  label = $LABEL
 +  read-only  # Partitions should be mounted read-only for checking

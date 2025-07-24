@@ -55,7 +55,7 @@ DEBUG=${DEBUG:-"NO"}
 
 # Set to "YES" in order to delete everything we have,
 # and rebuild any pre-existing .sxz modules from scratch:
-FORCE=${FORCE:-"NO"}
+FORCE=${FORCE:-"YES"}
 
 # Set to 32 to be more compatible with the specs. Slackware uses 4 by default:
 BOOTLOADSIZE=${BOOTLOADSIZE:-4}
@@ -130,8 +130,14 @@ LIVEPW=${LIVEPW:-"live"}
 # The nvidia persistence account:
 NVUID=${NVUID:-"nvidia"}
 NVUIDNR=${NVUIDNR:-"365"}
-NVGRP=${NVFRP:-"nvidia"}
+NVGRP=${NVGRP:-"nvidia"}
 NVGRPNR=${NVUIDNR:-"365"}
+
+# The flatpak account:
+FPUID=${FPUID:-"flatpak"}
+FPUIDNR=${FPUIDNR:-"372"}
+FPGRP=${FPGRP:-"flatpak"}
+FPGRPNR=${FPGRPNR:-"372"}
 
 # Custom name for the host:
 LIVE_HOSTNAME=${LIVE_HOSTNAME:-"darkstar"}
@@ -152,7 +158,7 @@ WAIT=${WAIT:-"5"}
 #
 
 # Who built the live image:
-BUILDER=${BUILDER:-"Alien BOB"}
+BUILDER=${BUILDER:-"mac-a-r0ni"}
 
 # Console font to use with syslinux for better language support:
 CONSFONT=${CONSFONT:-"ter-i16v.psf"}
@@ -195,7 +201,7 @@ SL_ARCH=${SL_ARCH:-"x86_64"}
 # Root directory of a Slackware local mirror tree;
 # You can define custom repository location (must be in local filesystem)
 # for any module in the file ./pkglists/<module>.conf:
-SL_REPO=${SL_REPO:-"/var/cache/liveslak/Slackware"}
+SL_REPO=${SL_REPO:-"/home/liveslak-kde6/"}
 DEF_SL_REPO=${SL_REPO}
 
 # The rsync URI of our default Slackware mirror server:
@@ -208,7 +214,7 @@ if [ "$(echo ${SL_VERSION}|cut -d. -f1)" == "14" ]; then
   SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,kdei,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
 else
   # Exclude Emacs to keep the ISO size below DVD size:
-  SEQ_SLACKWARE="tagfile:a,ap,d,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
+  SEQ_SLACKWARE="tagfile:a,ap,d,kde,l,n,tcl,x,xap,y pkglist:slackextra"
 fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
@@ -246,7 +252,7 @@ SEQ_STUDW="tagfile:a,ap,d,e,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra,sl
 # Package blacklists for variants:
 #BLACKLIST_DAW="seamonkey"
 #BLACKLIST_LEAN="seamonkey"
-BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars seamonkey"
+BLACKLIST_SLACKWARE="google-go-lang gcc-gdc gcc-gnat gcc-objc seamonkey kstars krita calligra calligraplan digikam amarok labplot marble ktuberling klettres"
 #BLACKLIST_XFCE="gst-plugins-bad-free lynx mc motif mozilla-firefox pidgin xlockmore"
 
 # Potentially we will use package(s) from 'testing' instead of regular repo:
@@ -257,7 +263,7 @@ TESTINGLIST_DAW=""
 # List of kernel modules required for a live medium to boot properly;
 # Lots of HID modules added to support keyboard input for LUKS password entry;
 # Virtio modules added to experiment with liveslak in a VM.
-KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
+KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net:i2c-dev"}
 
 # Network kernel modules to include for NFS root support:
 NETMODS="kernel/drivers/net kernel/drivers/virtio"
@@ -324,10 +330,10 @@ SQ_COMP=${SQ_COMP:-"xz"}
 LIVE_ROOTDIR=${LIVE_ROOTDIR:-"/mnt/slackwarelive"}
 
 # Directory where the live ISO image will be written:
-OUTPUT=${OUTPUT:-"/tmp"}
+OUTPUT=${OUTPUT:-"/home/liveslak-kde6"}
 
 # Directory where we create the staging directory:
-TMP=${TMP:-"/tmp"}
+TMP=${TMP:-"/home/liveslak-kde6/"}
 
 # Toplevel directory of our staging area (this needs sufficient storage):
 LIVE_STAGING=${LIVE_STAGING:-"${TMP}/slackwarelive_staging"}
@@ -1168,7 +1174,7 @@ function create_iso() {
 
   # Time to determine the output filename, now that we know all the variables
   # and ensured that the OUTPUT directory exists:
-  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}.iso"}
+  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}-kde6.iso"}
   if [ "$USEXORR" = "NO" ]; then
     mkisofs -o "${OUTFILE}" \
       -V "${MEDIALABEL}" \
@@ -1977,11 +1983,6 @@ then
   if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
     echo "-- Enabling pipewire"
     chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
-    # If you also want to make pipewire replace jack, do:
-    #echo "-- Removing Jack from system and enabling Pipewire emulation"
-    #chroot ${LIVE_ROOTDIR} /sbin/removepkg jack2
-    #mkdir -p ${LIVE_ROOTDIR}/etc/ld.so.conf.d
-    #echo "/usr/lib${LIBDIRSUFFIX}/pipewire-0.3/jack/" > ${LIVE_ROOTDIR}/etc/ld.so.conf.d/pipewire-jack.conf
   fi
   # Add configuration tweaks for the user:
   # We default to using a 48000 Hz sample rate throughout:
@@ -2021,6 +2022,8 @@ if ! chroot ${LIVE_ROOTDIR} /usr/bin/getent passwd ${NVUID} > /dev/null 2>&1 ;
 then
   chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${NVGRPNR} ${NVGRP}
   chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "Nvidia persistence" -u ${NVUIDNR} -g ${NVGRPNR} -d /dev/null -s /bin/false ${NVUID}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${FPGRPNR} ${FPGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${FPUIDNR} -g ${FPGRPNR} -d /var/lib/${FPGRP} -s /bin/false ${FPUID}
   if ! echo "${NVUID}:$(openssl rand -base64 12)" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null ; then
     echo "${NVUID}:$(openssl rand -base64 12)" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
   fi
@@ -2202,14 +2205,43 @@ cat <<EOT >> ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
 http://ftp.osuosl.org/.2/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
 EOT
 
-## Blacklist the l10n packages;
-#cat << EOT >> ${LIVE_ROOTDIR}/etc/slackpkg/blacklist
-#
-## Blacklist the l10n packages;
-#calligra-l10n-
-#kde-l10n-
-#
-#EOT
+# Blacklist the stock kde packages;
+cat << EOT >> ${LIVE_ROOTDIR}/etc/slackpkg/blacklist
+
+# If you want updates for kde6, don't blacklist kde/ !!
+
+# xfce is blacklisted to minimize bloat
+xfce/
+# These packages are no longer a part of plasma 6
+# but since we aren't blacklisting kde/ we need to 
+# manually ensure the slackware shipped ones do not
+# get installed
+akonadi-notes
+drkonqi
+kactivities
+kactivities-stats
+kdewebkit
+kemoticons
+kgamma5
+khtml
+khotkeys
+kinit
+kipi-plugins
+kirigami2
+kjs
+kjsembed
+kjots
+kmediaplayer
+knotes
+kopete
+kross
+kross-interpreters
+kxmlrpcclient
+latte-dock
+libkipi
+plasma-framework
+
+EOT
 
 # If we added slackpkg+ for easier system management, let's configure it too.
 # Update the cache for slackpkg:
@@ -2228,27 +2260,20 @@ ALLOW32BIT=off
 USEBL=1
 WGETOPTS="--timeout=20 --tries=2"
 GREYLIST=on
-PKGS_PRIORITY=( restricted alienbob ktown mate )
-REPOPLUS=( slackpkgplus restricted alienbob ktown mate )
-MIRRORPLUS['slackpkgplus']=https://slackware.nl/slackpkgplus/
-MIRRORPLUS['restricted']=http://slackware.nl/people/alien/restricted_sbrepos/${SL_VERSION}/${SL_ARCH}/
-MIRRORPLUS['alienbob']=http://slackware.nl/people/alien/sbrepos/${SL_VERSION}/${SL_ARCH}/
-MIRRORPLUS['mate']=http://slackware.uk/msb/${SL_VERSION}/latest/${SL_ARCH}/ 
-#MIRRORPLUS['studioware']=http://slackware.uk/studioware/${SL_VERSION}/ 
+STRICTGPG=on
+SEARCH_CLOG_INPARENT=on
+PKGS_PRIORITY=( slackaroni slackware64 )
+REPOPLUS=( slackaroni )
+# occasionally there are unstable builds available, uncomment below and add the repo
+# *before* slackaroni in REPOPLUS above to utilize them
+#MIRRORPLUS['kde6-unstable']=https://slackware.lngn.net/pub/x86_64/slackware64-current/kde6-unstable/
+MIRRORPLUS['slackaroni']=https://slackware.lngn.net/pub/x86_64/slackware64-current/
 EOPL
-  # Use the appropriate ktown variant:
-  eval $( grep "^ *VARIANT=" ${LIVE_TOOLDIR}/pkglists/ktown.conf)
-  if [ "$VARIANT" = "testing" ]; then
-    cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
-#MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
-MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
+  cat <<EOPL > etc/slackpkg/greylist
+fcitx5-configtool
+fcitx5-qt
+sddm
 EOPL
-  else
-    cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
-#MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
-MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
-EOPL
-  fi
 fi
 
 # Slackpkg wants you to opt-in on slackware-current:
@@ -2721,21 +2746,15 @@ if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/libexec/kf5 ] || [ -d ${LIVE_ROOTDIR
 
   # Remove broken/unwanted shortcuts (discover and konqueror) from taskbar:
   sed -i ${LIVE_ROOTDIR}/usr/share/plasma/plasmoids/org.kde.plasma.taskmanager/contents/config/main.xml \
-    -e 's#,applications:org.kde.discover.desktop##' \
     -e s'#,preferred://browser##'
 
   # Set the OS name to "Slackware Live" in "System Information":
-  if [ -f "${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc" ]; then
-    KDE_ABOUT_DISTRO="${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc"
-  else
-    KDE_ABOUT_DISTRO="${LIVE_ROOTDIR}/etc/xdg/kcm-about-distrorc"
-  fi
-  echo "Name=${DISTRO^} Live" >> ${KDE_ABOUT_DISTRO}
+  echo "Name=${DISTRO^} Live" >> ${LIVE_ROOTDIR}/etc/xdg/kcm-about-distrorc
   # Use os-release's VERSION (default=false means: use VERSION_ID)
-  echo "UseOSReleaseVersion=true" >> ${KDE_ABOUT_DISTRO}
+  echo "UseOSReleaseVersion=true" >> ${LIVE_ROOTDIR}/etc/xdg/kcm-about-distrorc
   if [ "${SL_VERSION}" = "current" ]; then
     # Some more detail on development release:
-    echo "Variant=Post-stable development (-current)" >> ${KDE_ABOUT_DISTRO}
+    echo "Variant=Post-stable development (-current)" >> ${LIVE_ROOTDIR}/etc/xdg/kcm-about-distrorc
   fi
 
   # Set sane SDDM defaults on first boot (root-owned file):
@@ -2888,6 +2907,8 @@ EOT
 export QT_QPA_PLATFORM=xcb
 # Force the usage of X11 platform for GDK applications:
 export GDK_BACKEND=x11
+# set for lxqt
+export COMPOSITOR=kwin_wayland
 EOT
   cat <<EOT > ${LIVE_ROOTDIR}/etc/profile.d/kwayland.csh
 #!/bin/csh
@@ -3286,16 +3307,8 @@ echo "-- Tweaking system startup."
 # -------------------------------------------------------------------------- #
 
 # Configure the default DE when running startx:
-if [ "$LIVEDE" = "MATE" ]; then
-  ln -sf xinitrc.mate-session ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ "$LIVEDE" = "CINNAMON" ]; then
-  ln -sf xinitrc.cinnamon-session ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ "$LIVEDE" = "DLACK" ]; then
-  ln -sf xinitrc.gnome ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.kde ]; then
+if [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.kde ]; then
   ln -sf xinitrc.kde ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.xfce ]; then
-  ln -sf xinitrc.xfce ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
 fi
 
 # Configure the default runlevel:
@@ -3439,6 +3452,11 @@ if  [ -x /etc/rc.d/rc.nvidia-persistenced ] && [ -d /var/run/nvidia-persistenced
   chown ${NVUID}:${NVGRP} /var/run/nvidia-persistenced 2>/dev/null
   /etc/rc.d/rc.nvidia-persistenced start
 fi
+
+# Start the power-profiles-daemon:
+if [ -x /etc/rc.d/rc.power-profiles ]; then
+  /etc/rc.d/rc.power-profiles start
+fi
 EOT
 
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/rc.d/rc.local_shutdown
@@ -3447,6 +3465,11 @@ cat <<EOT >> ${LIVE_ROOTDIR}/etc/rc.d/rc.local_shutdown
 if  [ -x /etc/rc.d/rc.nvidia-persistenced ]; then
   echo "Stopping nvidia persistence daemon..."
   /etc/rc.d/rc.nvidia-persistenced stop
+fi
+
+# Stop the power-profiles-daemon:
+if [ -x /etc/rc.d/rc.power-profiles ]; then
+  /etc/rc.d/rc.power-profiles stop
 fi
 EOT
 

@@ -9,7 +9,6 @@ atkmm
 #audacious-plugins
 blueman
 cairomm
-cairomm1
 dav1d
 farstream
 ffmpegthumbnailer
@@ -19,11 +18,9 @@ geeqie
 gimp
 gkrellm
 glibmm
-glibmm2
 gnuchess
 gparted
 gtkmm3
-gtkmm4
 gucharmap
 gv
 hexchat
@@ -53,7 +50,6 @@ mpv
 mujs
 network-manager-applet
 pangomm
-pangomm2
 pavucontrol
 pidgin
 polkit-gnome
