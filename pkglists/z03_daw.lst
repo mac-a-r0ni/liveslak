@@ -2,9 +2,7 @@
 OpenBLAS
 a2jmidid
 alsa-plugins-jack
-alsa-scarlett-gui
 amsynth
-appstream
 ardour
 aubio
 audacity
@@ -35,7 +33,7 @@ glfw
 guile1.8
 guitarix
 gxplugins.lv2
-helm-synth
+helm
 hidapi
 hydrogen
 jack_capture
@@ -46,7 +44,6 @@ jq
 ladspa_sdk
 libconfig
 libcyaml
-libebur128
 libfishsound
 libgig
 liblo
@@ -72,7 +69,6 @@ mpc
 muse
 musescore
 mxml
-nlohmann-json
 noise-repellent
 non-daw
 ntk
@@ -89,7 +85,6 @@ python-pathlib2
 python-poppler-qt5
 python-pygame
 python-pyliblo
-python-pyproject-metadata
 python-pyo
 qjackctl
 qmidiarp
@@ -99,6 +94,7 @@ qsynth
 qtractor
 rapidjson
 raptor2
+redkite
 rosegarden
 rtaudio
 rtmidi
@@ -109,7 +105,6 @@ shntool
 smooth
 sonic-pi
 sonic-visualiser
-sonivox
 sord
 soundfont-unison
 soundtouch
@@ -117,7 +112,6 @@ speex
 sratom
 suil
 supercollider
-surge-xt
 twolame
 uriparser
 vamp-aubio-plugins
@@ -136,18 +130,15 @@ vcvrack-squinkyvcv
 vcvrack-studiosixplusone
 vcvrack-valley
 vmpk
-vst3sdk
-wxWidgets
+wxGTK3
 wxpython
 x42-plugins
 yaml-cpp
-yyjson
 zita-ajbridge
 zita-alsa-pcmi
 zita-convolver
 zita-resampler
-zix
 zrythm
-zynaddsubfx
-#zyn-fusion
+#zynaddsubfx
+zyn-fusion
 

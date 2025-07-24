@@ -98,7 +98,6 @@ libproxy
 libpsl
 libpthread-stubs
 libqmi
-libqrtr-glib
 libsamplerate
 libsndfile
 libssh
@@ -110,8 +109,6 @@ libtheora
 libtiff
 libtirpc
 ##libtool
-libtraceevent
-libtracefs
 libusbmuxd
 libvorbis
 libvpx
@@ -135,7 +132,6 @@ nettle
 newt
 nfs-utils
 nghttp2
-nghttp3
 nmap
 nss-mdns
 ntfs-3g
@@ -145,7 +141,6 @@ openjpeg
 orc
 os-prober
 p11-kit
-pipewire
 pm-utils
 pkg-config
 pulseaudio

@@ -36,7 +36,6 @@ mint-l-icons
 mint-y-icons
 mint-y-theme
 mozjs
-mozjs115
 muffin
 nemo
 pam
@@ -50,9 +49,8 @@ py3cairo
 pygobject3-python3
 python-pam
 python3
-python3-libsass
-python3-webencodings
 python3-xapp
+python3-webencodings
 pytz
 sassc
 setproctitle

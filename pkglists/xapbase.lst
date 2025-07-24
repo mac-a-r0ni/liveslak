@@ -1,7 +1,6 @@
 Cython
 LibRaw
 MPlayer
-aom
 aspell
 atkmm
 # requires qt5 now:
@@ -9,8 +8,6 @@ atkmm
 #audacious-plugins
 blueman
 cairomm
-cairomm1
-dav1d
 farstream
 ffmpegthumbnailer
 fltk
@@ -19,41 +16,29 @@ geeqie
 gimp
 gkrellm
 glibmm
-glibmm2
 gnuchess
 gparted
 gtkmm3
-gtkmm4
 gucharmap
 gv
 hexchat
 imagemagick
 # Needed in Core OS, moved to noxbase:
 #jansson
-libass
 libcue
 libgnt
 libnice
 libnma
-libpaper
-libplacebo
 libptytty
 libsigc++
 libsigc++3
 libsodium
-libunibreak
-libyaml
 libzip
 lftp
-lua
-luajit
 mozilla-firefox
 #mozilla-thunderbird
-mpv
-mujs
 network-manager-applet
 pangomm
-pangomm2
 pavucontrol
 pidgin
 polkit-gnome
@@ -72,6 +57,7 @@ vim
 vim-gvim
 x11-ssh-askpass
 x3270
+xaos
 #xfractint
 xgames
 xlockmore

@@ -13,6 +13,7 @@ gettext
 guile
 intltool
 libtool
+lua
 m4
 make
 python-build

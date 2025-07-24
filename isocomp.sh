@@ -91,7 +91,7 @@ MINFREE=${MINFREE:-10}
 COMPR="xz --check=crc32"
 
 # These tools are required by the script, we will check for their existence:
-REQTOOLS="cpio cryptsetup fsck gzip isoinfo lsblk lzip lzma unsquashfs xz zstd"
+REQTOOLS="cpio cryptsetup fsck gzip isoinfo lsblk unsquashfs xz zstd"
 
 #
 #  -- function definitions --
@@ -311,16 +311,10 @@ function resizefs() {
 
 # Uncompress the initrd based on the compression algorithm used:
 function uncompressfs () {
-  local IMGFILE="$1"
-  # Content is streamed to STDOUT:
-  if $(file "${IMGFILE}" | grep -qi ": gzip"); then
-    gzip -cd "${IMGFILE}"
-  elif $(file "${IMGFILE}" | grep -qi ": XZ"); then
-    xz -cd "${IMGFILE}"
-  elif $(file "${IMGFILE}" | grep -qi ": LZMA"); then
-    lzma -cd "${IMGFILE}"
-  elif $(file "${IMGFILE}" | grep -qi ": lzip"); then
-    lzip -cd "${IMGFILE}"
+  if $(file "${1}" | grep -qi ": gzip"); then
+    gzip -cd "${1}"
+  elif $(file "${1}" | grep -qi ": XZ"); then
+    xz -cd "${1}"
   fi
 } # End of uncompressfs()
 
@@ -328,7 +322,7 @@ function uncompressfs () {
 # after it has been extracted into a directory:
 function read_initrddir() {
   local IMGDIR="$1"
-  local INITVARS="${2:-'DISTRO LIVEMAIN MARKER MEDIALABEL'}"
+  local INITVARS="$2"
   cd ${IMGDIR}
 
   # Read the values of liveslak template variables in the init script:
@@ -877,7 +871,7 @@ if [ -n "${LUKSCNT}" ]; then
   if [ -v 'CONTAINERS["${LUKSMNT}"]' ] && [ "${LUKSCNT}" != "${CONTAINERS["${LUKSMNT}"]}" ]; then
     # The configfile specifies a different mount for container:
     echo "*** On-disk configuration defines an existing mountpoint ${LUKSMNT}"
-    echo "*** for container '${USBMNT}${CONTAINERS["${LUKSMNT}"]}',"
+    echo "*** at '${USBMNT}${CONTAINERS["${LUKSMNT}"]}',"
     echo "*** which is different from your '-l ${USBMNT}${LUKSCNT}'."
     if [ $FORCE -eq 0 ]; then
       echo "*** Not adding encrypted container for ${LUKSMNT} , please fix the entry"
@@ -886,7 +880,7 @@ if [ -n "${LUKSCNT}" ]; then
       cleanup
       exit 1
     else
-      echo "--- Accepting new mountpoint '${LUKSMNT}' for encrypted container ${LUKSCNT}"
+      echo "--- Accepting new mountpoint '${LUKSMNT}' for encrypted container ${LUKSMNT}"
     fi
   fi
   # Create LUKS container file for the mount point (or re-use it if existing):

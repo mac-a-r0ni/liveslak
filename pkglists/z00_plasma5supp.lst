@@ -63,7 +63,6 @@ id3lib
 #json-glib
 kdsoap
 libXcm
-libass
 libburn
 libdbusmenu-qt
 libdmtx
@@ -84,6 +83,7 @@ libspectre
 liburing
 libva-utils
 libvncserver
+libyaml
 #lilo
 #lmdb
 man
@@ -91,7 +91,6 @@ man-db
 man-pages
 mariadb
 mlt
-noto-emoji
 noto-fonts-ttf
 opencv
 opus-tools
@@ -99,6 +98,7 @@ opusfile
 phonon
 phonon-backend-gstreamer
 phonon-vlc
+pipewire
 polkit-qt-1
 #poppler
 python2
@@ -133,9 +133,7 @@ taglib-extras
 #vim
 #vim-gvim
 #vulkan-sdk
-wireplumber
 woff2
-xaos
 xcb-util-cursor
 xcb-util-errors
 xcb-util-image
