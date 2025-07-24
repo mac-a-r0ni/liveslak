@@ -150,6 +150,9 @@ LIVEPW=$DEFPW
 # Max wait time for DHCP client to configure an interface:
 DHCPWAIT=20
 
+# Number of iterations to wait $WAIT seconds on USB readiness:
+WAITITER=10
+
 INITRD=$(cat /initrd-name)
 WAIT=$(cat /wait-for-root)
 KEYMAP=$(cat /keymap)
@@ -423,14 +426,17 @@ fi
 # Sometimes the devices need extra time to be available.
 # A root filesystem on USB is a good example of that.
 # Actually we are going to retry a few times for as long as needed:
-for ITER in 1 2 3 4 5 6 ; do
+for ITER in $(seq 1 $WAITITER); do
   echo "${MARKER}:  Sleeping $WAIT seconds to give slow USB devices some time."
   sleep $WAIT
-  # Fire one blkid to probe for readiness:
-  blkid -p 1>/dev/null 2>/dev/null
-  [ $? -eq 0 ] && break
-  echo "${MARKER}:  No sign of life from USB device, you're on your own..."
+  # Fire a blkid to probe for readiness:
+  if [ -n "$(blkid |grep ^/dev/)" ]; then
+    break
+  fi
 done
+if [ $ITER -eq $WAITITER ]; then
+  echo "${MARKER}:  No sign of life from USB device, you're on your own..."
+fi
 
 if [ "$RESCUE" = "" ]; then 
   if [ $LOCALHD -eq 1 ]; then
@@ -1058,7 +1064,7 @@ if [ "$RESCUE" = "" ]; then
   # which contains "VARIABLE=value" lines, where VARIABLE is one of
   # the following variables that are used below in the live init script:
   #   BLACKLIST, KEYMAP, LIVE_HOSTNAME, LOAD, LOCALE, LUKSVOL,
-  #   NOLOAD, RUNLEVEL, TWEAKS, TZ, XKB. 
+  #   NOLOAD, RUNLEVEL, TWEAKS, TZ, USBPERSISTENCE, XKB. 
   if [ -z "$CFGACTION" ]; then
     # Read OS configuration from disk file if present and set any variable
     # from that file if it has not yet been defined in the init script
@@ -1067,12 +1073,18 @@ if [ "$RESCUE" = "" ]; then
       echo "${MARKER}:  Reading config from /${LIVEMAIN}/${DISTROCFG}"
       for LIVEPARM in \
         BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL \
-        NOLOAD RUNLEVEL TWEAKS TZ XKB ;
+        NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB ;
       do
         if [ -z "$(eval echo \$${LIVEPARM})" ]; then
           eval $(grep -w ^${LIVEPARM} /mnt/media/${LIVEMAIN}/${DISTROCFG})
         fi
       done
+      # Handle any customization.
+      if [ -n "${USBPERSISTENCE}" ]; then
+        # Persistence container located on the USB stick - strip the extension:
+        PERSISTENCE=$(basename ${USBPERSISTENCE%.*})
+        PERSISTPATH=$(dirname ${USBPERSISTENCE})
+      fi
     fi
   elif [ "$CFGACTION" = "write" ]; then
     # Write liveslak OS parameters to disk:
@@ -1083,7 +1095,7 @@ if [ "$RESCUE" = "" ]; then
       echo "${MARKER}:  Writing config to /${LIVEMAIN}/${DISTROCFG}"
       for LIVEPARM in \
         BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL \
-        NOLOAD RUNLEVEL TWEAKS TZ XKB ;
+        NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB ;
       do
         if [ -n "$(eval echo \$$LIVEPARM)" ]; then
           echo $LIVEPARM=$(eval echo \$$LIVEPARM) >> /mnt/media/${LIVEMAIN}/${DISTROCFG}

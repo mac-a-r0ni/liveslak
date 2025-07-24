@@ -10,6 +10,7 @@ SDL2_net
 SDL2_ttf
 aalib
 adwaita-icon-theme
+adwaita-icon-theme-legacy
 appres
 at-spi2-atk
 at-spi2-core
@@ -43,6 +44,7 @@ ffmpeg
 fixesproto
 fluidsynth
 #font-adobe-100dpi
+#font-adobe-source-code-pro-otf
 font-alias
 #font-bh-100dpi
 #font-bh-75dpi
@@ -93,6 +95,8 @@ gstreamer0
 gtk+
 gtk+2
 gtk+3
+gtk4
+gtk-layer-shell
 gtksourceview3
 gtkspell
 gtkspell3
@@ -157,6 +161,7 @@ libclc
 libcroco
 libcupsfilters
 libdbusmenu
+libdisplay-info
 libdmx
 libdrm
 libepoxy
@@ -323,6 +328,7 @@ xhost
 xineramaproto
 xinit
 xinput
+xinput_calibrator
 xkbcomp
 xkbevd
 xkbprint

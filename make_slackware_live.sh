@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.8.1.2"
+VERSION="1.8.2"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -73,7 +73,7 @@ SECUREBOOT=0
 
 # Which shim to download and install?
 # Supported are 'debian' 'fedora' 'opensuse'.
-SHIM_3RDP=${SHIM_3RDP:-"fedora"}
+SHIM_3RDP=${SHIM_3RDP:-"debian"}
 
 # When enabling SecureBoot support, we need a MOK certificate plus private key,
 # which we use to sign grub and kernel.
@@ -279,6 +279,9 @@ KAPPEND_STUDIOWARE="threadirqs preempt=full loglevel=3 audit=0"
 
 # Add CACert root certificates yes/no?
 ADD_CACERT=${ADD_CACERT:-"NO"}
+
+# GPG public key for Grub signing under Secure Boot:
+SB_GPG_PUBKEY="none"
 
 # Default language selection for the Live OS; 'en' means generic English.
 # This can be changed with the commandline switch "-l":
@@ -774,13 +777,19 @@ function gen_bootmenu() {
     -e "s/@C2RSH@/$C2RMS/g" \
     > ${MENUROOTDIR}/vesamenu.cfg
 
+  # Get us a more recent version of keytab-lilo:
+  if [ ! -x /usr/local/sbin/keytab-lilo-liveslak ]; then
+    wget -nv -O /usr/local/sbin/keytab-lilo-liveslak \
+      'https://repo.or.cz/syslinux.git/blob_plain/HEAD:/utils/keytab-lilo'
+    chmod 0755 /usr/local/sbin/keytab-lilo-liveslak
+  fi
   for LANCOD in $(cat ${LIVE_TOOLDIR}/languages |grep -Ev "(^ *#|^$)" |cut -d: -f1)
   do
     LANDSC=$(cat ${LIVE_TOOLDIR}/languages |grep "^$LANCOD:" |cut -d: -f2)
     KBD=$(cat ${LIVE_TOOLDIR}/languages |grep "^$LANCOD:" |cut -d: -f3)
     # First, create keytab files if they are missing:
     if [ ! -f ${MENUROOTDIR}/${KBD}.ktl ]; then
-      keytab-lilo $(find /usr/share/kbd/keymaps/i386 -name "us.map.gz") $(find /usr/share/kbd/keymaps/i386 -name "${KBD}.map.gz") > ${MENUROOTDIR}/${KBD}.ktl
+      /usr/local/sbin/keytab-lilo-liveslak $(find /usr/share/kbd/keymaps/i386 -name "us.map.gz") $(find /usr/share/kbd/keymaps/i386 -name "${KBD}.map.gz") > ${MENUROOTDIR}/${KBD}.ktl
     fi
     # Add this keyboard to the keyboard selection menu:
     cat <<EOL >> ${MENUROOTDIR}/kbd.cfg
@@ -856,6 +865,7 @@ function gen_uefimenu() {
   rm -f ${GRUBDIR}/kbd.cfg
   rm -f ${GRUBDIR}/lang.cfg
   rm -f ${GRUBDIR}/tz.cfg
+  rm -f ${GRUBDIR}/tz
 
   # Generate main grub.cfg:
   cat ${LIVE_TOOLDIR}/grub.tpl | sed \
@@ -910,7 +920,7 @@ menuentry "${LANDSC}" {
   export sl_kbd
   export sl_xkb
   export sl_lang
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -922,7 +932,7 @@ menuentry "${LANDSC}" {
   set sl_lang="$LANDSC"
   export sl_locale
   export sl_lang
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -946,20 +956,20 @@ EOL
     # First the submenu for this zone:
     cat <<EOL >> ${GRUBDIR}/tz.cfg
 submenu "${TZ} >" {
-  configfile \$prefix/${TZ}/tz.cfg
+  configfile \$cmdpath/tz/${TZ}/tz.cfg
 }
 
 EOL
     # Then the locations for this zone:
-    mkdir ${GRUBDIR}/${TZ}
+    mkdir -p ${GRUBDIR}/tz/${TZ}
     ( cd $TZDIR/$TZ
       find . -type f | xargs file | grep "timezone data" | cut -f 1 -d : | cut -f2- -d / | sort | while read LOCN ; do
         # Add this entry to the keyboard selection menu:
-        cat <<EOL >> ${GRUBDIR}/${TZ}/tz.cfg
+        cat <<EOL >> ${GRUBDIR}/tz/${TZ}/tz.cfg
 menuentry "${TZ}/${LOCN}" {
   set sl_tz="${TZ}/${LOCN}"
   export sl_tz
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -974,7 +984,7 @@ EOL
 menuentry "${ZONE}" {
   set sl_tz="$ZONE"
   export sl_tz
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -1006,6 +1016,13 @@ function secureboot() {
   SHIM_VENDOR="$1"
   [ -z "${SHIM_VENDOR}" ] && SHIM_VENDOR="fedora"
 
+  GNUPGHOME="$2"
+  if [ -z "${GNUPGHOME}" ] || [ ! -d ${GNUPGHOME} ]; then
+    echo "** GNUPGHOME not correctly set in 'secureboot()'! Exiting..."
+    exit 99
+  fi
+  export GNUPGHOME
+
   case $SHIM_VENDOR in
     opensuse)      GRUB_SIGNED="grub.efi"
                    ;;
@@ -1015,8 +1032,8 @@ function secureboot() {
   mkdir -p ${LIVE_WORK}/shim
   cd ${LIVE_WORK}/shim
 
-  echo "-- Signing grub+kernel with '${LIVE_STAGING}/EFI/BOOT/liveslak.pem'."
-  # Sign grub:
+  echo "-- Signing grub+kernel with '${LIVE_STAGING}/EFI/BOOT/liveslak.der'."
+  # Sign grub and kernel:
   # The Grub EFI image must be renamed appropriately for shim to find it,
   # since some distros change the default 'grubx64.efi' filename:
   mv -i ${LIVE_STAGING}/EFI/BOOT/bootx64.efi \
@@ -1029,6 +1046,23 @@ function secureboot() {
   sbsign --key ${MOKPRIVKEY} --cert ${MOKCERT} \
     --output ${LIVE_STAGING}/boot/generic \
     ${LIVE_WORK}/shim/generic.unsigned 
+
+  echo "-- Signing kernel, initrd, theme and config files with GPG."
+  # When Grub runs under Secure Boot, it checks for valid GPG signatures
+  # for every file it loads.
+  # Remember, we created an ephemeral passwordless GPG key:
+  for MYFILE in \
+    ${LIVE_STAGING}/EFI/BOOT/liveslak/* \
+    ${LIVE_STAGING}/EFI/BOOT/tz/*/* \
+    ${LIVE_STAGING}/EFI/BOOT/*.cfg \
+    ${LIVE_STAGING}/EFI/BOOT/*.txt \
+    ${LIVE_STAGING}/boot/generic \
+    ${LIVE_STAGING}/boot/initrd.img \
+    ${LIVE_STAGING}/boot/memtest
+  do
+    rm -f ${MYFILE}.sig
+    gpg2 --batch --detach-sign ${MYFILE}
+  done
 
   if [ "${SHIM_VENDOR}" = "fedora" ]; then
     # The version of Fedora's shim package - always use the latest!
@@ -1048,8 +1082,8 @@ function secureboot() {
     #install -D -m0644 boot/efi/EFI/BOOT/fbx64.efi \
     #  ${LIVE_STAGING}/EFI/BOOT/fbx64.efi
   elif [ "${SHIM_VENDOR}" = "opensuse" ]; then
-    SHIM_MAJVER=15.4
-    SHIM_MINVER=7.2
+    SHIM_MAJVER=15.8
+    SHIM_MINVER=3.1
     SHIMSRC="https://download.opensuse.org/repositories/openSUSE:/Factory/standard/x86_64/shim-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from openSUSE."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1104,6 +1138,7 @@ function secureboot() {
 
   # Cleanup:
   rm -rf ${LIVE_WORK}/shim
+  rm -rf ${GNUPGHOME}
 
 } # End of secureboot()
 
@@ -1535,9 +1570,9 @@ DEF_SL_PATCHROOT=${SL_PATCHROOT}
 # Are all the required add-on tools present?
 [ "$USEXORR" = "NO" ] && ISOGEN="mkisofs isohybrid" || ISOGEN="xorriso"
 PROG_MISSING=""
-REQTOOLS="mksquashfs unsquashfs grub-mkfont grub-mkimage syslinux $ISOGEN installpkg upgradepkg keytab-lilo rsync wget mkdosfs"
+REQTOOLS="mksquashfs unsquashfs grub-mkfont grub-mkimage grub-mkstandalone syslinux $ISOGEN installpkg upgradepkg keytab-lilo rsync wget mkdosfs"
 if [ $SECUREBOOT -eq 1 ]; then
-   REQTOOLS="${REQTOOLS} openssl sbsign"
+   REQTOOLS="${REQTOOLS} gpg2 openssl sbsign"
 fi
 for PROGN in ${REQTOOLS} ; do
   if ! which $PROGN 1>/dev/null 2>/dev/null ; then
@@ -1558,7 +1593,7 @@ if ! echo ${SQ_COMP_AVAIL} | grep -wq ${SQ_COMP} ; then
   exit 1
 else
   # Test whether the local squashfs-tools support the compressor:
-  if ! mksquashfs 2>&1 | grep -Ewq "^[[:space:]]*${SQ_COMP}" ; then
+  if ! mksquashfs -help-section compression 2>&1 | grep -Ewq "^[[:space:]]*${SQ_COMP}" ; then
     echo "-- Compressor '${SQ_COMP}' not supported by your 'mksquashfs'!"
     echo "-- Select another one from '${SQ_COMP_AVAIL}'"
     exit 1
@@ -1942,7 +1977,25 @@ then
   if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
     echo "-- Enabling pipewire"
     chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
+    # If you also want to make pipewire replace jack, do:
+    #echo "-- Removing Jack from system and enabling Pipewire emulation"
+    #chroot ${LIVE_ROOTDIR} /sbin/removepkg jack2
+    #mkdir -p ${LIVE_ROOTDIR}/etc/ld.so.conf.d
+    #echo "/usr/lib${LIBDIRSUFFIX}/pipewire-0.3/jack/" > ${LIVE_ROOTDIR}/etc/ld.so.conf.d/pipewire-jack.conf
   fi
+  # Add configuration tweaks for the user:
+  # We default to using a 48000 Hz sample rate throughout:
+  mkdir -p ${LIVE_ROOTDIR}/etc/skel/.config/pipewire/pipewire-pulse.conf.d/
+  cat <<EOT > ${LIVE_ROOTDIR}/etc/skel/.config/pipewire/pipewire-pulse.conf.d/liveslak.conf
+pulse.properties = {
+    pulse.min.req          = 256/48000
+    pulse.min.frag         = 256/48000
+    pulse.min.quantum      = 256/48000
+}
+stream.properties = {
+    node.latency = 1024/48000
+}
+EOT
 fi
 
 # Prevent loop devices (sxz modules) from appearing in filemanagers:
@@ -2084,14 +2137,26 @@ termcap  vt100* ms:AL=\E[%dL:DL=\E[%dM:UP=\E[%dA:DO=\E[%dB:LE=\E[%dD:RI=\E[%dC
 terminfo vt100* ms:AL=\E[%p1%dL:DL=\E[%p1%dM:UP=\E[%p1%dA:DO=\E[%p1%dB:LE=\E[%p1%dD:RI=\E[%p1%dC
 termcapinfo linux C8
 
-# Tabbed colored hardstatus line
-hardstatus alwayslastline
-hardstatus string '%{= Kd} %{= Kd}%-w%{= Kr}[%{= KW}%n %t%{= Kr}]%{= Kd}%+w %-= %{KG} %H%{KW}|%{KY}%101`%{KW}|%D %M %d %Y%{= Kc} %C%A%{-}'
 # Hide hardstatus: ctrl-a f
 bind f eval "hardstatus ignore"
 # Show hardstatus: ctrl-a F
 bind F eval "hardstatus alwayslastline"
+
+# Tabbed colored hardstatus line
+hardstatus alwayslastline
 EOT
+if [ "${SL_VERSION}" != "current" ]; then
+  cat <<"EOT" >> ${LIVE_ROOTDIR}/etc/skel/.screenrc
+hardstatus string '%{= Kd} %{= Kd}%-w%{= Kr}[%{= KW}%n %t%{= Kr}]%{= Kd}%+w %-= %{KG} %H%{KW}|%{KY}%101`%{KW}|%D %M %d %Y%{= Kc} %C%A%{-}'
+EOT
+else
+  cat <<"EOT" >> ${LIVE_ROOTDIR}/etc/skel/.screenrc
+truecolor on
+hardstatus off
+hardstatus string '%{= .;#999999} %{= .;#999999}%-w%{= #ff0000;#999999}[%{= #ffffff;#999999}%n %t%{= #ff0000;#999999}]%{= .;#999999}%+w %-= %{#00ff00;#999999} %H%{#ffffff;#999999}|%{#ffff00;#999999}%101`%{#ffffff;#999999}|%D %M %d %Y%{= #00ffff;#999999} %c%{-}'
+EOT
+fi
+
 # Give root a copy:
 cat ${LIVE_ROOTDIR}/etc/skel/.screenrc > ${LIVE_ROOTDIR}/root/.screenrc
 
@@ -2660,12 +2725,17 @@ if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/libexec/kf5 ] || [ -d ${LIVE_ROOTDIR
     -e s'#,preferred://browser##'
 
   # Set the OS name to "Slackware Live" in "System Information":
-  echo "Name=${DISTRO^} Live" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  if [ -f "${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc" ]; then
+    KDE_ABOUT_DISTRO="${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc"
+  else
+    KDE_ABOUT_DISTRO="${LIVE_ROOTDIR}/etc/xdg/kcm-about-distrorc"
+  fi
+  echo "Name=${DISTRO^} Live" >> ${KDE_ABOUT_DISTRO}
   # Use os-release's VERSION (default=false means: use VERSION_ID)
-  echo "UseOSReleaseVersion=true" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  echo "UseOSReleaseVersion=true" >> ${KDE_ABOUT_DISTRO}
   if [ "${SL_VERSION}" = "current" ]; then
     # Some more detail on development release:
-    echo "Variant=Post-stable development (-current)" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+    echo "Variant=Post-stable development (-current)" >> ${KDE_ABOUT_DISTRO}
   fi
 
   # Set sane SDDM defaults on first boot (root-owned file):
@@ -3050,7 +3120,7 @@ then
       cat <<EOT > ${LIVE_ROOTDIR}/etc/security/limits.d/rt_audio.conf
 # Realtime capability allowed for user in the 'audio' group:
 # Use 'unlimited' with care, you can lock up your system when app misbehaves:
-#@audio   -  memlock    2097152
+#@audio   -  memlock    4194304
 @audio   -  memlock    unlimited
 @audio   -  rtprio     95
 EOT
@@ -3547,9 +3617,11 @@ umount -R ${LIVE_ROOTDIR} || true
 # Note to self: syslinux does not 'see' files unless they are DOS 8.3 names?
 rm -rf ${LIVE_STAGING}/boot
 mkdir -p ${LIVE_STAGING}/boot
-if [ "${KIMGNAME_STYLE}" = "NEW2" ]; then
+# Do we use old style (vmlinuz-generic-$KGEN) or one of the new styles
+# (vmlinuz-$KGEN-generic or vmlinux-$KGEN) kernel image name?
+if [ -f ${LIVE_BOOT}/boot/vmlinuz-${KGEN} ]; then
   cp -a ${LIVE_BOOT}/boot/vmlinuz-${KGEN} ${LIVE_STAGING}/boot/generic
-elif [ "${KIMGNAME_STYLE}" = "NEW1" ]; then
+elif [ -f ${LIVE_BOOT}/boot/vmlinuz-${KGEN}-generic ]; then
   cp -a ${LIVE_BOOT}/boot/vmlinuz-${KGEN}-generic ${LIVE_STAGING}/boot/generic
 else
   cp -a ${LIVE_BOOT}/boot/vmlinuz-generic*-${KGEN} ${LIVE_STAGING}/boot/generic
@@ -3562,29 +3634,60 @@ mksquashfs ${LIVE_BOOT} ${LIVE_MOD_SYS}/0000-${DISTRO}_boot-${SL_VERSION}-${SL_A
 # Copy the syslinux configuration.
 # The next block checks here for a possible UEFI grub boot image:
 cp -a ${LIVE_TOOLDIR}/syslinux ${LIVE_STAGING}/boot/
+# We have memtest in the syslinux bootmenu:
+mv ${LIVE_STAGING}/boot/syslinux/memtest ${LIVE_STAGING}/boot/
 
 # EFI support always for 64bit architecture, but conditional for 32bit.
 if [ "$SL_ARCH" = "x86_64" -o "$EFI32" = "YES" ]; then
   # Copy the UEFI boot directory structure:
   rm -rf ${LIVE_STAGING}/EFI/BOOT
   mkdir -p ${LIVE_STAGING}/EFI/BOOT
-  cp -a ${LIVE_TOOLDIR}/EFI/BOOT/{grub-embedded.cfg,make-grub.sh,*.txt,theme} ${LIVE_STAGING}/EFI/BOOT/
+  cp -a ${LIVE_TOOLDIR}/EFI/BOOT/{grub-embedded.cfg,make-grub.sh,*.txt,liveslak} ${LIVE_STAGING}/EFI/BOOT/
+
   if [ ${SECUREBOOT} -eq 1 ]; then
     # User needs a DER-encoded copy of the signing cert for MOK enrollment:
     openssl x509 -outform der -in ${MOKCERT} -out ${LIVE_STAGING}/EFI/BOOT/liveslak.der
+    # Grub needs a GPG public key and we need the private key as well.
+    # This will be an ephemeral key.
+    # Key-type 1 is RSA (https://datatracker.ietf.org/doc/html/rfc4880#section-9.1):
+    echo "-- Generating ephemeral GPG key pair"
+    SB_GPG_PUBKEY=${LIVE_STAGING}/EFI/BOOT/liveslak.pub
+    export GNUPGHOME="$(mktemp -d -p /dev/shm liveslak-sb-XXXXXX)"
+    gpg2 --batch --gen-key <<EOF
+Key-Type: 1
+Key-Length: 4096
+Subkey-Type: 1
+Subkey-Length: 4096
+Name-Real: Slackware Secure Boot
+Name-Comment: Ephemeral key for Grub signature checking
+Name-Email: ca@slackware.nl
+Expire-Date: 0
+%no-protection
+%commit
+%echo Passwordless GPG key pair created.
+EOF
+  # Export the pubkey:
+  gpg2 -a --export "ca@slackware.nl" > ${SB_GPG_PUBKEY}
+  chmod 444 ${SB_GPG_PUBKEY}
+  echo "-- GPG key finferprint: $(gpg2 --show-keys --with-colons ${SB_GPG_PUBKEY} |grep fpr |head -1 |rev |cut -d: -f2 |rev)"
   fi
+
   if [ "$LIVEDE" = "XFCE" ]; then
     # We do not use the unicode font, so it can be removed to save space:
-    rm -f ${LIVE_STAGING}/EFI/BOOT/theme/unicode.pf2
+    rm -f ${LIVE_STAGING}/EFI/BOOT/liveslak/unicode.pf2
   fi
 
   # Create the grub fonts used in the theme.
   # Command outputs string like this: "Font name: DejaVu Sans Mono Regular 5".
-  for FSIZE in 5 10 12 20 24 ; do
+  echo "-- Generating GRUB fonts"
+  for FSIZE in 5 12 15 ; do
     grub-mkfont -s ${FSIZE} -av \
-      -o ${LIVE_STAGING}/EFI/BOOT/theme/dejavusansmono${FSIZE}.pf2 \
+      -o ${LIVE_STAGING}/EFI/BOOT/liveslak/dejavusansmono${FSIZE}.pf2 \
       /usr/share/fonts/TTF/DejaVuSansMono.ttf \
       | grep "^Font name: "
+    # Spam the root filesystem (no way around Secure Boot otherwise:
+    install -m0644 ${LIVE_STAGING}/EFI/BOOT/liveslak/dejavusansmono${FSIZE}.pf2 \
+      /usr/share/grub/
   done
 
   # The grub-embedded.cfg in the bootx64.efi/bootia32.efi looks for this file:
@@ -3596,11 +3699,15 @@ if [ "$SL_ARCH" = "x86_64" -o "$EFI32" = "YES" ]; then
       # Create a SBAT file 'grub_sbat.csv' to be used by make-grub.sh :
       cat <<HSBAT > ${LIVE_STAGING}/EFI/BOOT/grub_sbat.csv
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
-grub,1,Free Software Foundation,grub,2.06,https://www.gnu.org/software/grub/
+grub,3,Free Software Foundation,grub,2.12,https//www.gnu.org/software/grub/
 grub.liveslak,1,The liveslak project,grub,${GRUBVER}-${GRUBBLD},https://download.liveslak.org/
 HSBAT
       sed -i -e "s/SLACKWARELIVE/${MARKER}/g" grub-embedded.cfg
-      sh make-grub.sh EFIFORM=${EFIFORM} EFISUFF=${EFISUFF}
+      if [ ${SECUREBOOT} -eq 1 ]; then
+        gpg2 --batch --detach-sign grub-embedded.cfg
+      fi
+      # Hints taken from https://wiki.archlinux.org/title/GRUB/Tips_and_tricks
+      sh make-grub.sh EFIFORM=${EFIFORM} EFISUFF=${EFISUFF} GPGKEY=${SB_GPG_PUBKEY}
     )
   fi
 
@@ -3609,7 +3716,7 @@ HSBAT
 
   # Add SecureBoot support if requested:
   if [ ${SECUREBOOT} -eq 1 ]; then
-    secureboot ${SHIM_3RDP}
+    secureboot ${SHIM_3RDP} ${GNUPGHOME}
   fi
 
 fi # End EFI support menu.
@@ -3641,8 +3748,6 @@ for SLFILE in message.txt f2.txt syslinux.cfg lang.cfg ; do
 done
 # The iso2usb.sh script can use this copy of a MBR file as fallback:
 cp -a /usr/share/syslinux/gptmbr.bin ${LIVE_STAGING}/boot/syslinux/
-# We have memtest in the syslinux bootmenu:
-mv ${LIVE_STAGING}/boot/syslinux/memtest ${LIVE_STAGING}/boot/
 
 # Make use of proper console font if we have it available:
 if [ -f /usr/share/kbd/consolefonts/${CONSFONT}.gz ]; then

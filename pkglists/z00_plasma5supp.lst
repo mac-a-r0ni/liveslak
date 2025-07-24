@@ -7,13 +7,11 @@ PyQt5
 QScintilla
 QtAV
 accountsservice
-aom
 cdparanoia
 cfitsio
 cldr-emoji-annotation
 cryfs
 cryptopp
-dav1d
 daemon
 #djvulibre
 dotconf
@@ -78,17 +76,14 @@ libkkc-data
 #libnice
 liboggz
 libpinyin
-libplacebo
 libqalculate
 libraw1394
 libsass
 #libseccomp
 libspectre
-libunibreak
 liburing
 libva-utils
 libvncserver
-libyaml
 #lilo
 #lmdb
 man
@@ -96,6 +91,7 @@ man-db
 man-pages
 mariadb
 mlt
+noto-emoji
 noto-fonts-ttf
 opencv
 opus-tools
@@ -103,7 +99,6 @@ opusfile
 phonon
 phonon-backend-gstreamer
 phonon-vlc
-pipewire
 polkit-qt-1
 #poppler
 python2
@@ -140,6 +135,7 @@ taglib-extras
 #vulkan-sdk
 wireplumber
 woff2
+xaos
 xcb-util-cursor
 xcb-util-errors
 xcb-util-image

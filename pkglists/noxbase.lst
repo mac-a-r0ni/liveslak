@@ -110,6 +110,8 @@ libtheora
 libtiff
 libtirpc
 ##libtool
+libtraceevent
+libtracefs
 libusbmuxd
 libvorbis
 libvpx
@@ -143,6 +145,7 @@ openjpeg
 orc
 os-prober
 p11-kit
+pipewire
 pm-utils
 pkg-config
 pulseaudio

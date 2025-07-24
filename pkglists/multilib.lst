@@ -18,6 +18,7 @@ glibc-solibs
 aaa_elflibs-compat32
 aaa_libraries-compat32
 attr-compat32
+bcachefs-tools-compat32
 bzip2-compat32
 cracklib-compat32
 dbus-compat32
@@ -28,6 +29,7 @@ libgudev-compat32
 libpwquality-compat32
 lzlib-compat32
 openssl10-solibs-compat32
+openssl11-solibs-compat32
 openssl-solibs-compat32
 pam-compat32
 plzip-compat32
@@ -189,6 +191,7 @@ rpcsvc-proto-compat32
 sbc-compat32
 sdl-compat32
 seamonkey-solibs-compat32
+seatd-compat32
 slang-compat32
 speex-compat32
 speexdsp-compat32
@@ -217,6 +220,7 @@ libgpg-error-compat32
 libtirpc-compat32
 nettle-compat32
 nghttp2-compat32
+nghttp3-compat32
 openldap-client-compat32
 openldap-compat32
 openssl-compat32

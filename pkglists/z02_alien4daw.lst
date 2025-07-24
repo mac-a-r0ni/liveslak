@@ -1,12 +1,12 @@
 #FAudio
 #MinGW-w64
-boost-compat
+#boost-compat
 dropbox-client
 fdk-aac
 gst-plugins-ffmpeg0
 mbedtls
 obs-studio
-openjdk11
+openjdk17
 openconnect
 soxr
 unrar
