@@ -341,7 +341,6 @@ function read_distroconfig() {
 
 # Write variables to distro config (/liveslak/slackware_os.cfg)
 function write_distroconfig() {
-  # Uses global arrays: CONTAINERS
   # Uses global variables: DISTRO, VERSION
   # Uses global variables: BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB
   local MYDISTROCFG="${1}"
@@ -533,11 +532,6 @@ function cont_mb() {
 
 # Create a container file in the empty space of the partition
 function create_container() {
-  # Uses external function: cleanup
-  # Uses global arrays: CONTAINERS
-  # Uses global variables: CNTEXT, DEFMNT, FSYS, ISOMNT, MINFREE
-  # Sets global variables: CNTDEV, CNTMNT, LODEV, PARTFREE, PARTSIZE
-
   local CNTPART=$1 # partition containing the ISO
   local CNTSIZE=$2 # size of the container file to create
   local CNTFILE=$3 # ${CNTEXT} filename with full path
@@ -651,14 +645,8 @@ function create_container() {
     umount ${CNTDEV}
   fi
 
+  # Don't forget to clean up after ourselves:
   if [ "${CNTENCR}" = "luks" ]; then
-    # Update CONTAINERS using the path to the container in the USB filesystem.
-    # First remove any redundant slashes:
-    CNTFILE=$(echo ${CNTFILE} |tr -s '/')
-    # Determine the container mount point and remove that from the path:
-    MYMNT=$(cd "$(dirname "${CNTFILE}")" ; df --output=target . |tail -1)
-    CONTAINERS["${CNTUSED}"]="${CNTFILE#${MYMNT}}"
-    # Don't forget to clean up after ourselves:
     cryptsetup luksClose ${MYMAP}
   fi
   losetup -d ${LODEV} || true
@@ -1094,10 +1082,6 @@ if [ -n "${HLUKSSIZE}" ]; then
   # If file extension is missing in the containername, add it now:
   if [ "${SLHOME%${CNTEXT}}" == "${SLHOME}" ]; then
     SLHOME="${SLHOME}${CNTEXT}"
-  fi
-  # If filename is a relative path, add a slash:
-  if [ "${SLHOME:0:1}" != "/" ]; then 
-    SLHOME="/${SLHOME}"
   fi
   # Create LUKS container file for /home aka DEFMNT;
   LUKSHOME="${SLHOME}"

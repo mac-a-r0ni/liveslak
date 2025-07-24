@@ -143,13 +143,6 @@ for GMOD in \
   [ -f ${GMODDIR}/${GMOD}.mod ] && GMODLIST="${GMODLIST} ${GMOD}" || echo ">> ${GMOD} not found"
 done
 
-# Grub 2.12 has a long-standing bug fixed:
-grub-mkstandalone --core-compress=xz 1>/dev/null 2>/dev/null
-if [ $? -eq 64 ]; then
-  CORECOMPRESS=" "
-else
-  CORECOMPRESS=" --core-compress=xz "
-fi
 
 # Build bootx64.efi/bootia32.efi, which will be installed here in ${EFIDIR}.
 grub-mkstandalone \
@@ -161,9 +154,9 @@ grub-mkstandalone \
   --output=boot${EFISUFF}.efi \
   --sbat=grub_sbat.csv \
   --compress=no \
+  --core-compress=xz \
   --locales="en@quot" \
   --themes="" \
-  ${CORECOMPRESS} \
   ${KEYPARAM} \
   "boot/grub/grub.cfg=./grub-embedded.cfg"
 

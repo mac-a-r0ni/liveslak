@@ -5,12 +5,12 @@
 #
 # Global Properties:
 title-text: ""
-title-font: "DejaVu Sans Mono Regular 15"
+title-font: "DejaVu Sans Mono Regular 19"
 title-color: "#5569B9"
 desktop-image: "swlogog.png"
 desktop-color: "#000000"
-message-font: "DejaVu Sans Mono Regular 15"
-terminal-font: "DejaVu Sans Mono Regular 12"
+message-font: "DejaVu Sans Mono Regular 19"
+terminal-font: "DejaVu Sans Mono Regular 15"
 
 # Show the boot menu
 + boot_menu {
@@ -18,7 +18,7 @@ terminal-font: "DejaVu Sans Mono Regular 12"
   top = 35%
   width = 75%
   height = 45%
-  item_font = "DejaVu Sans Mono Regular 15"
+  item_font = "DejaVu Sans Mono Regular 19"
   item_color = "lightgrey"
   selected_item_color = "red"
   item_height = 15
@@ -47,6 +47,6 @@ terminal-font: "DejaVu Sans Mono Regular 12"
   left = 31%
   height = 20
   + label {
-    text = "Enter: Boot Selection     E: Edit Selection     C: GRUB Commandline" font = "DejaVu Sans Mono Regular 12" color = "#B9556B" align = "center"
+    text = "Enter: Boot Selection     E: Edit Selection     C: GRUB Commandline" font = "DejaVu Sans Mono Regular 15" color = "#B9556B" align = "center"
   }
 }
