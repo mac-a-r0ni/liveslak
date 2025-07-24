@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL
+# Copyright 2015, 2016, 2017, 2019, 2020, 2021, 2022, 2023, 2024  Eric Hameleers, Eindhoven, NL
 # All rights reserved.
 #
 # Redistribution and use of this script, with or without modification, is
@@ -50,6 +50,9 @@ FSYS="${DEF_FS}"
 DEF_SLHOME="slhome"
 SLHOME="${DEF_SLHOME}"
 
+# Default mount point for a LUKS container if not specified:
+DEFMNT="/home"
+
 # By default, we use 'persistence' as the name of the persistence directory,
 # or 'persistence.img' as the name of the persistence container:
 DEF_PERSISTENCE="persistence"
@@ -72,15 +75,28 @@ VERBOSE=0
 
 # Variables to store content from an initrd we are going to refresh:
 OLDPERSISTENCE=""
-OLDWAIT=""
 OLDLUKS=""
 OLDVERSION=""
 
+# Distro config variables:
+BLACKLIST=""
+KEYMAP=""
+LIVE_HOSTNAME=""
+LOAD=""
+LOCALE=""
+LUKSVOL=""
+NOLOAD=""
+RUNLEVEL=""
+TWEAKS=""
+TZ=""
+USBPERSISTENCE=""
+XKB=""
+
+# Associative array to capture LUKSVOL definitions:
+declare -A CONTAINERS=()
+
 # Version information stored in the ISO file:
 VERSION=""
-
-# Seconds to add to the initrd as wait-for-root value:
-WAIT=5
 
 # No LUKS encryption by default:
 DOLUKS=0
@@ -89,7 +105,7 @@ DOLUKS=0
 REFRESH=0
 
 # These tools are required by the script, we will check for their existence:
-REQTOOLS="blkid cpio cryptsetup extlinux fdisk find gdisk gzip isoinfo losetup lsblk lzip mkdosfs sgdisk syslinux wipefs xz"
+REQTOOLS="blkid cpio cryptsetup extlinux fdisk find gdisk gzip isoinfo losetup lsblk lzip lzma mkdosfs sgdisk syslinux wipefs xz"
 
 # Path to syslinux files:
 if [ -d /usr/share/syslinux ]; then
@@ -166,7 +182,7 @@ cat <<EOT
 # If you are not using the refresh option '-r' then this data will be *erased* !
 #
 # $(basename $0) accepts the following parameters:
-#   -c|--crypt size|perc       Add LUKS encrypted /home ; parameter is the
+#   -c|--crypt size|perc       Add LUKS encrypted $DEFMNT ; parameter is the
 #                              requested size of the container in kB, MB, GB,
 #                              or as a percentage of free space
 #                              (integer numbers only).
@@ -176,7 +192,7 @@ cat <<EOT
 #   -h|--help                  This help.
 #   -i|--infile <filename>     Full path to the ISO image file.
 #   -l|--lukshome <name>       Custom path to the containerfile for your LUKS
-#                              encrypted /home ($SLHOME by default).
+#                              encrypted $DEFMNT ($SLHOME by default).
 #   -o|--outdev <filename>     The device name of your USB drive.
 #   -p|--persistence <name>    Custom path to the 'persistence' directory
 #                              or containerfile ($PERSISTENCE by default).
@@ -186,7 +202,6 @@ cat <<EOT
 #                              providing a devicename (using option '-o').
 #   -u|--unattended            Do not ask any questions.
 #   -v|--verbose               Show verbose messages.
-#   -w|--wait <number>         Add <number> seconds wait time to initialize USB.
 #   -y|--layout <x,x,x,x>      Specify partition layout and sizes (in MB).
 #                              Default values: '$DEF_LAYOUT' for 3 partitions,
 #                              the '-1' value for partition 3 meaning
@@ -211,9 +226,12 @@ cat <<EOT
 #
 # Examples:
 #
-# $(basename $0) -i ~/download/slackware64-live-14.2.iso -o /dev/sdX
-# $(basename $0) -i slackware64-live-xfce-current.iso -o /dev/mmcblkX -c 750M -w 15
-# $(basename $0) -i slackware-live-current.iso -o /dev/sdX -y 1,200,-1,4096
+# Transfer the ISO content to a USB stick, overwriting existing content:
+#   $(basename $0) -i ~/download/slackware64-live-15.0.iso -o /dev/sdX
+# Transfer ISO content to a eMMC device and create a 750MB encrypted $DEFMNT :
+#   $(basename $0) -i slackware64-live-xfce-current.iso -o /dev/mmcblkX -c 750M
+# Use a custom partition layout, creating a 4 GB un-used partition at the end:
+#   $(basename $0) -i slackware-live-current.iso -o /dev/sdX -y 1,200,-1,4096
 #
 EOT
 } # End of showhelp()
@@ -300,83 +318,184 @@ function show_devices() {
   echo "#"
 } # End of show_devices()
 
-# Read configuration data from old initrd:
-function read_initrd() {
-  IMGFILE="$1"
-
-  OLDPERSISTENCE=$(uncompressfs ${IMGFILE} |cpio -i --to-stdout init |grep "^PERSISTENCE" |cut -d '"' -f2 2>/dev/null)
-  OLDWAIT=$(uncompressfs ${IMGFILE} |cpio -i --to-stdout wait-for-root 2>/dev/null)
-  OLDLUKS=$(uncompressfs ${IMGFILE} |cpio -i --to-stdout luksdev 2>/dev/null)
-} # End of read_initrd()
-
-# Add longer USB WAIT to the initrd:
-function update_initrd() {
-  IMGFILE="$1"
-
-  # USB boot medium needs a few seconds boot delay else the overlay will fail.
-  # Check if we need to update the wait-for-root file in the initrd:
-  if [ "$OLDWAIT" = "$WAIT" -a $DOLUKS -eq 0 -a $REFRESH -eq 0 ]; then
-    return
+# Read variables from distro config (/liveslak/slackware_os.cfg)
+function read_distroconfig() {
+  # Sets global variables: BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL NO LOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB
+  local MYDISTROCFG="${1}"
+  local LIVEPARM
+  # Read Distro customization from the "@DISTRO@_os.cfg" file if it exists:
+  if [ -f "${MYDISTROCFG}" ]; then
+    for LIVEPARM in \
+      BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL \
+      NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB ;
+    do
+      # Read values from disk only if the variable has not been set yet:
+      if [ -z "$(eval echo \$${LIVEPARM})" ]; then
+        eval $(grep -w ^${LIVEPARM} ${MYDISTROCFG})
+      fi
+    done
+  else
+    echo "-- No distro configuration (${MYDISTROCFG}) found."
   fi
-  
-  if [ -z "$IMGDIR" ]; then
-    # Create a temporary extraction directory for the initrd:
-    mkdir -p /mnt
-    IMGDIR=$(mktemp -d -p /mnt -t alienimg.XXXXXX)
-    if [ ! -d $IMGDIR ]; then
-      echo "*** Failed to create a temporary extraction directory for the initrd!"
-      exit 1
+} # End of read_distroconfig()
+
+# Write variables to distro config (/liveslak/slackware_os.cfg)
+function write_distroconfig() {
+  # Uses global variables: DISTRO, VERSION
+  # Uses global variables: BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB
+  local MYDISTROCFG="${1}"
+  local MYPART="${2}"
+
+  if [ ${#CONTAINERS[@]} -gt 0 ]; then
+    # CONTAINERS array is non-empty; (re-)assemble the LUKSVOL variable.
+    # First zap the LUKSVOL value:
+    LUKSVOL=""
+    # Write the CONTAINERS array back into LUKSVOL in the correct format:
+    for _mount in "${!CONTAINERS[@]}"; do
+      LUKSVOL="${LUKSVOL}${CONTAINERS[$_mount]}:${_mount},"
+    done
+    # Remove the trailing ',':
+    LUKSVOL="${LUKSVOL::-1}"
+  fi
+
+  # Preserve user additions:
+  if [ -f ${MYDISTROCFG} ]; then
+    cat ${MYDISTROCFG} \
+      | grep -Ev '(^# --|^BLACKLIST=|^KEYMAP=|^LIVE_HOSTNAME=|^LOAD LOCALE=|^LUKSVOL=|^NOLOAD=|^RUNLEVEL=|^TWEAKS=|^TZ=|^USBPERSISTENCE=|^XKB=)' \
+      > ${MYDISTROCFG}.orig \
+      || true # an empty 'grep' result has exit code 1, terminating the script.
+  fi
+
+  # Write updated customization into the Distro cfg file:
+  echo "# -- Liveslak ${DISTRO} configuration file for ${VERSION}" > ${MYDISTROCFG} 2>/dev/null
+  echo "# -- Generated by $(basename $0) on $(date +%Y%m%d_%H%M)" >> ${MYDISTROCFG} 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "***  USB media ${MYPART} read-only, cannot write config file."
+  else
+    for LIVEPARM in \
+      BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL \
+      NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB ;
+    do
+      if [ -n "$(eval echo \$$LIVEPARM)" ]; then
+        echo $LIVEPARM=$(eval echo \$$LIVEPARM) >> ${MYDISTROCFG}
+      fi 
+    done
+    if [ -f ${MYDISTROCFG}.orig ]; then
+      echo "# -- Preserved user additions -- #" >> ${MYDISTROCFG}
+      cat ${MYDISTROCFG}.orig >> ${MYDISTROCFG}
+      rm -f ${MYDISTROCFG}.orig
     fi
   fi
-  chmod 711 $IMGDIR
+} # End of write_distroconfig()
 
-  echo "--- Extracting Slackware initrd and adding rootdelay for USB..."
+# Update distro configuration variables (and translate LUKSVOL -> CONTAINERS)
+# before writing to disk:
+function update_distroconfig() {
+  # Uses global arrays: CONTAINERS
+  # Uses global variables: DISTRO
+  # Uses global variables: BLACKLIST KEYMAP LIVE_HOSTNAME LOAD LOCALE LUKSVOL NOLOAD RUNLEVEL TWEAKS TZ USBPERSISTENCE XKB
+
+  if [ $REFRESH -eq 1 ]; then
+    echo "--- Refreshing ${DISTRO} Live configuration..."
+    if [ -n "$OLDLUKS" ]; then
+      echo "--- Detected LUKS container configuration:"
+      echo "$OLDLUKS" | sed 's/^/    /'
+    fi
+    LUKSVOL="$OLDLUKS"
+
+    if [ "${PERSISTENCE}" != "${DEF_PERSISTENCE}" ]; then
+      # If the user specified a nonstandard persistence, use that:
+      echo "--- Update persistence from '$OLDPERSISTENCE' to '$PERSISTENCE'"
+      USBPERSISTENCE="${PERSISTENCE}"
+    elif [ "${PERSISTENCE}" != "${OLDPERSISTENCE}" ]; then
+      # The user did not specify persistence, re-use the retrieved value:
+      echo "--- Re-use previous '$OLDPERSISTENCE' for persistence"
+      USBPERSISTENCE="${OLDPERSISTENCE}"
+      PERSISTENCE="${OLDPERSISTENCE}"
+    fi
+  else
+    if [ "${PERSISTENCE}" != "${DEF_PERSISTENCE}" ]; then
+      # If the user specified a nonstandard persistence, use that:
+      echo "--- Update persistence from '$DEF_PERSISTENCE' to '$PERSISTENCE'"
+      USBPERSISTENCE="${PERSISTENCE}"
+    fi
+  fi
+
+  # Determine where in LUKSVOL the /home (aka DEFMNT) is defined (or not).
+  # The LUKSVOL value looks like:
+  # "/path/to/cntner1:/mountpoint1,[/path/to/cntner2:/mountpoint2,[...]]"
+  # Break down the LUKSVOL value into container/mountpoint combo's:
+  if [ -n "$LUKSVOL" ]; then
+    _container=""
+    _mount=""
+    for _luksvol in $(echo $LUKSVOL |tr ',' ' '); do
+      _container="$(echo $_luksvol |cut -d: -f1)"
+      _mount="$(echo $_luksvol |cut -d: -f2)"
+      if [ "$_mount" == "$_container" ]; then
+        # No optional mount point specified, so we use the default:
+        CONTAINERS["${DEFMNT}"]="$_container"
+      else
+        CONTAINERS["$_mount"]="$_container"
+      fi
+    done
+  fi
+
+  if [ $DOLUKS -eq 1 ]; then
+    # Check if we already have a container mounted on DEFMNT:
+    if [ -v 'CONTAINERS["${DEFMNT}"]' ] && [ "${LUKSHOME}" != "${CONTAINERS["${DEFMNT}"]}" ]; then
+      echo "*** On-disk configuration defines an existing container"
+      echo "*** '${CONTAINERS["${DEFMNT}"]}', to be mounted at '${DEFMNT}'."
+      echo "*** This is different from your parameter '-l ${LUKSHOME}'."
+      if [ $FORCE -eq 0 ]; then
+        echo "*** Not creating new encrypted container for '${DEFMNT}',"
+        echo "*** please fix LUKSVOL in '/${LIVEMAIN}/${DISTRO}_os.cfg',"
+        echo "*** or supply the correct value for the '-l' parameter"
+        echo "*** ... or add parameter '-f' to enforce this action!"
+      else
+        echo "--- Accepting mountpoint '${DEFMNT}' for new encrypted container '${LUKSHOME}',"
+        echo "--- and changing mountpoint for '${CONTAINERS["${DEFMNT}"]}' to '${DEFMNT}_prev'."
+        CONTAINERS["${DEFMNT}_prev"]="${CONTAINERS["${DEFMNT}"]}"
+        CONTAINERS["${DEFMNT}"]="${LUKSHOME}"
+      fi
+    fi
+  fi
+} # End of update_distroconfig()
+
+# Read configuration data from the initrd inside the ISO,
+# after it has been extracted into a directory:
+function read_initrddir() {
+  local IMGDIR="$1"
+  local INITVARS="${2:-'DISTRO LIVEMAIN MARKER MEDIALABEL'}"
   cd ${IMGDIR}
-    uncompressfs ${IMGFILE} \
-      | cpio -i -d -m -H newc
-    
-    if [ $REFRESH -eq 1 ]; then
-      echo "--- Refreshing Slackware initrd..."
-      WAIT="$OLDWAIT"
-      if [ -n "$OLDLUKS" ]; then
-        echo "--- Detected LUKS container configuration:"
-        echo "$OLDLUKS" | sed 's/^/    /'
-      fi
-      echo "$OLDLUKS" >> luksdev
-      if [ "${PERSISTENCE}" != "${DEF_PERSISTENCE}" ]; then
-        # If the user specified a nonstandard persistence, use that:
-        echo "--- Updating persistence from '$OLDPERSISTENCE' to '$PERSISTENCE'"
-        sed -i -e "s,^PERSISTENCE=.*,PERSISTENCE=\"${PERSISTENCE}\"," init
-      elif [ "${PERSISTENCE}" != "${OLDPERSISTENCE}" ]; then
-        # The user did not specify persistence, re-use the retrieved value:
-        sed -i -e "s,^PERSISTENCE=.*,PERSISTENCE=\"${OLDPERSISTENCE}\"," init
-        echo "--- Re-use previous '$OLDPERSISTENCE' for persistence"
-        PERSISTENCE="${OLDPERSISTENCE}"
-      fi
-    else
-      if [ "${PERSISTENCE}" != "${DEF_PERSISTENCE}" ]; then
-        # If the user specified a nonstandard persistence, use that:
-        echo "--- Updating persistence from '$DEF_PERSISTENCE' to '$PERSISTENCE'"
-        sed -i -e "s,^PERSISTENCE=.*,PERSISTENCE=\"${PERSISTENCE}\"," init
-      fi
-    fi
 
-    echo "--- Updating 'waitforroot' time from '$OLDWAIT' to '$WAIT'"
-    echo ${WAIT} > wait-for-root
+  # Retrieve the currently defined LUKS device:
+  OLDLUKS=$(cat ./luksdev)
 
-    if [ $DOLUKS -eq 1 -a -n "${LUKSHOME}" ]; then
-      if ! grep -q ${LUKSHOME} luksdev ; then
-        echo "--- Adding '${LUKSHOME}' as LUKS /home:"
-        echo "${LUKSHOME}" >> luksdev
-      fi
-    fi
+  # Retrieve the currently defined name for persistence:
+  OLDPERSISTENCE=$(cat ./init |grep "^PERSISTENCE" |cut -d '"' -f2)
 
-    echo "--- Compressing the initrd image again:"
-    chmod 0755 ${IMGDIR}
-    find . |cpio -o -H newc |$COMPR > ${IMGFILE}
-  cd - 1>/dev/null
-  rm -rf $IMGDIR/*
-} # End of update_initrd()
+  # Read the values of liveslak template variables in the init script:
+  for TEMPLATEVAR in ${INITVARS} ; do
+    eval $(grep "^ *${TEMPLATEVAR}=" ./init |head -1)
+  done
+} # End of read_initrddir()
+
+# Extract the initrd:
+function extract_initrd() {
+  local IMGFILE="$1"
+  local IMGDIR=$(mktemp -d -p /tmp -t alienimg.XXXXXX)
+  if [ ! -d $IMGDIR ]; then
+    echo "*** Failed to create temporary extraction directory for the initrd!"
+    cleanup
+    exit 1
+  else
+    chmod 711 $IMGDIR
+  fi
+  cd ${IMGDIR}
+    uncompressfs ${IMGFILE} 2>/dev/null \
+      | cpio -i -d -m -H newc 2>/dev/null
+  echo "$IMGDIR"
+} # End of extract_initrd()
 
 # Determine size of a mounted partition (in MB):
 function get_part_mb_size() {
@@ -594,10 +713,6 @@ while [ ! -z "$1" ]; do
     -v|--verbose)
       VERBOSE=1
       shift
-      ;;
-    -w|--wait)
-      WAIT="$2"
-      shift 2
       ;;
     -y|--layout)
       LAYOUT="$2"
@@ -906,14 +1021,28 @@ fi
 
 if [ $REFRESH -eq 0 ]; then
   # Collect data from the ISO initrd:
-  read_initrd ${ISOMNT}/boot/initrd.img
+  IMGDIR=$(extract_initrd ${ISOMNT}/boot/initrd.img)
+  read_initrddir ${IMGDIR} "DISTRO LIVEMAIN MARKER MEDIALABEL"
 else
   # Collect data from the USB initrd:
-  read_initrd ${USBMNT}/boot/initrd.img
+  IMGDIR=$(extract_initrd ${USBMNT}/boot/initrd.img)
+  read_initrddir ${IMGDIR} "DISTRO LIVEMAIN MARKER MEDIALABEL"
+  # Collect customization parameters for the USB:
+  read_distroconfig ${USBMNT}/${LIVEMAIN}/${DISTRO}_os.cfg
   # Display the old Live version:
   OLDVERSION="$(cat ${USBMNT}/.isoversion 2>/dev/null)"
   if [ -n "${OLDVERSION}" -a -n "${VERSION}" ]; then
     echo "--- Refreshing Live OS on USB (${OLDVERSION}) to '${VERSION}'."
+  fi
+  if [ -n "${USBPERSISTENCE}" ]; then
+    # Persistence information was already updated in the past, so we use
+    # the information on the USB instead of the value we found in the ISO:
+    OLDPERSISTENCE="${USBPERSISTENCE}"
+  fi
+  if [ -n "${LUKSVOL}" ]; then
+    # LUKS volume information was already updated in the past, so we use
+    # the information on the USB instead of the value we found in the ISO:
+    OLDLUKS="${LUKSVOL}"
   fi
 fi
 
@@ -954,20 +1083,20 @@ if [ -n "${HLUKSSIZE}" ]; then
   if [ "${SLHOME%${CNTEXT}}" == "${SLHOME}" ]; then
     SLHOME="${SLHOME}${CNTEXT}"
   fi
-  # Create LUKS container file for /home ;
+  # Create LUKS container file for /home aka DEFMNT;
   LUKSHOME="${SLHOME}"
-  create_container ${TARGETP3} ${HLUKSSIZE} "${USBMNT}/${LUKSHOME}" luks /home
+  create_container ${TARGETP3} ${HLUKSSIZE} "${USBMNT}/${LUKSHOME}" luks ${DEFMNT}
 fi
 
-# Update the initrd with regard to USB wait time, persistence and LUKS.
+# Update the initrd configuration with regard to persistence and LUKS.
 # If this is a refresh and anything changed to persistence, then the
 # variable $PERSISTENCE will have the correct value when exing this function:
 # If you want to move your LUKS home containerfile you'll have to do that
 # manually - not a supported option for now.
-update_initrd ${USBMNT}/boot/initrd.img
+update_distroconfig ${USBMNT}/${LIVEMAIN}/${DISTRO}_os.cfg
 
+# Determine what we need to do with persistence if this is a refresh.
 if [ $REFRESH -eq 1 ]; then
-  # Determine what we need to do with persistence if this is a refresh.
   if [ "${PERSISTENCE}" != "${OLDPERSISTENCE}" ]; then
     # The user specified a nonstandard persistence, so move the old one first;
     # hide any errors if it did not *yet* exist:
@@ -990,6 +1119,7 @@ if [ $REFRESH -eq 1 ]; then
   fi
 fi
 
+# Now perform the actual steps:
 if [ "${PERSISTTYPE}" = "dir" ]; then
   # Create persistence directory:
   mkdir -p ${USBMNT}/${PERSISTENCE}
@@ -1044,10 +1174,13 @@ if [ $EFIBOOT -eq 1 ]; then
     rsync -rlptD --delete \
       ${ISOMNT}/boot/ ${US2MNT}/boot/
   fi
-  # Copy the modified initrd over from the Linux partition:
+  # Copy the initrd over from the Linux partition:
   cat ${USBMNT}/boot/initrd.img > ${US2MNT}/boot/initrd.img
   sync
 fi
+
+# Write customization parameters to the USB:
+write_distroconfig ${USBMNT}/${LIVEMAIN}/${DISTRO}_os.cfg
 
 # No longer needed; umount the USB partitions so we can write a new MBR:
 if mount |grep -qw ${USBMNT} ; then umount ${USBMNT} ; fi

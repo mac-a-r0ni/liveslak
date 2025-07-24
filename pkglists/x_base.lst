@@ -10,6 +10,7 @@ SDL2_net
 SDL2_ttf
 aalib
 adwaita-icon-theme
+adwaita-icon-theme-legacy
 appres
 at-spi2-atk
 at-spi2-core
@@ -23,7 +24,9 @@ cairo
 cdrtools
 compositeproto
 cups
+cups-browsed
 cups-filters
+cxxopts
 damageproto
 dbus-python
 dejavu-fonts-ttf
@@ -41,6 +44,7 @@ ffmpeg
 fixesproto
 fluidsynth
 #font-adobe-100dpi
+#font-adobe-source-code-pro-otf
 font-alias
 #font-bh-100dpi
 #font-bh-75dpi
@@ -63,6 +67,7 @@ fribidi
 fslsfonts
 fstobdf
 gcr
+gcr4
 gd
 gegl
 gexiv2
@@ -79,6 +84,7 @@ gobject-introspection
 graphene
 graphite2
 gsettings-desktop-schemas
+gspell
 gst-plugins-bad-free
 gst-plugins-base
 gst-plugins-base0
@@ -89,6 +95,8 @@ gstreamer0
 gtk+
 gtk+2
 gtk+3
+gtk4
+gtk-layer-shell
 gtksourceview3
 gtkspell
 gtkspell3
@@ -151,7 +159,9 @@ libcanberra
 libcap-ng
 libclc
 libcroco
+libcupsfilters
 libdbusmenu
+libdisplay-info
 libdmx
 libdrm
 libepoxy
@@ -169,6 +179,7 @@ libinput
 libiodbc
 libmng
 libmypaint
+libppd
 librsvg
 libsecret
 libunwind
@@ -213,6 +224,7 @@ pycairo
 pygobject
 pygobject3
 pygtk
+python2-pycairo
 python-MarkupSafe
 python-distro
 qrencode
@@ -316,6 +328,7 @@ xhost
 xineramaproto
 xinit
 xinput
+xinput_calibrator
 xkbcomp
 xkbevd
 xkbprint

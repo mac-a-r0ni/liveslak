@@ -20,7 +20,6 @@ gst-plugins-libav
 icedtea-web
 icu4c-compat
 keepassxc
-#lame
 libreoffice
 #libreoffice-dict-af
 #libreoffice-dict-ar
@@ -68,17 +67,14 @@ libreoffice
 libstatgrab
 #libtinfo
 libtorrent-rasterbar
-#lumina
 #mkvtoolnix
 muparser
 netsurf
 nodejs
-#nvme-cli
 openconnect
 openjdk11
 #oxygen-gtk2
 p7zip
-#palemoon
 podofo
 poppler-qt5
 python-twisted

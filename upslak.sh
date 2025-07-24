@@ -127,6 +127,7 @@ MINFREE=${MINFREE:-10}
 
 # Variables to store content from an initrd we are going to refresh:
 OLDKERNELSIZE=""
+OLDKMODDIRSIZE=""
 OLDWAIT=""
 
 # Record the version of the new kernel:
@@ -627,7 +628,6 @@ function read_initrddir() {
   local INITVARS="$2"
   local OLDKVER
   local OLDMODDIR
-  local OLDKMODDIRSIZE
   local PREVMODDIR
 
   cd ${IMGDIR}
@@ -1106,7 +1106,7 @@ if [ -f "${EXTENSION}" ]; then
       # User already mounted the USB linux partition; remove mountpoint:
       EXTENSION="${EXTENSION#$EXTMNT}"
     fi
-elif [ "$(dirname ${EXTENSION})" == "." ]; then
+elif [ -n "${EXTENSION}" && "$(dirname ${EXTENSION})" == "." ]; then
   # Containerfile was provided without leading slash, add one:
   EXTENSION="/${EXTENSION}"
 fi
@@ -1214,7 +1214,7 @@ fi
 # Update the initrd with regard to USB wait time, liveinit, kernel:
 update_initrd ${USBMNT}/boot/initrd.img ${IMGDIR}
 
-# Add the new modules  as a squashfs module:
+# Add the new kernel modules as a squashfs module:
 if [ $UPKERNEL -eq 1 ] && [ $NOLIVEMODS -eq 0 ]; then
   LIVE_MOD_SYS=$(dirname $(find ${USBMNT} -name "0099-${DISTRO}_zzzconf*.sxz" |head -1))
   LIVE_MOD_ADD=$(dirname ${LIVE_MOD_SYS})/addons
@@ -1280,7 +1280,19 @@ if [ $CHANGES2SXZ -eq 1 ]; then
       echo "*** Unable to create file '/mnt/live/changes/.wipe'!"
       echo "*** Are you sure you are running ${DISTRO^} Live Edition?"
     else
-      # Squash the persistence data into a Live .sxz module:
+      # Squash the persistence data into a Live .sxz module,
+      # but only if we find the space to do so:
+      CHANGESSIZE=$(du -sm /mnt/live/changes/ |tr '\t' ' ' |cut -d' ' -f1)
+      if [ $(( $USBPFREE - $CHANGESSIZE )) -lt $MINFREE ]; then
+        CHANGES2SXZ=-1
+      fi
+      if [ $CHANGES2SXZ -eq -1 ]; then
+        echo "*** Not enough space to squash persistence data into a module."
+        # Don't wipe persistence data on next boot!
+        rm -f /mnt/live/changes/.wipe
+        cleanup
+        exit 1
+      fi
       LIVE_MOD_SYS=$(dirname $(find ${USBMNT} -name "0099-${DISTRO}_zzzconf*.sxz" |head -1))
       LIVE_MOD_ADD=$(dirname ${LIVE_MOD_SYS})/addons
       MODNAME="0100-${DISTRO}_customchanges-$(date +%Y%m%d%H%M%S).sxz"

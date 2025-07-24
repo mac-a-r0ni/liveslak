@@ -5,7 +5,9 @@ aaa_libraries
 aaa_terminfo
 acl
 attr
+avahi
 bash
+bcachefs-tools
 bin
 binutils
 # Add 'bind' at the end because it does a chroot:
@@ -28,6 +30,7 @@ dialog
 diffutils
 dmidecode
 dnsmasq
+duktape
 e2fsprogs
 ed
 elilo
@@ -73,6 +76,7 @@ kmod
 krb5
 less
 libassuan
+libdaemon
 libedit
 libevent
 libgcrypt
@@ -102,6 +106,8 @@ mozjs60
 mozjs68
 mozjs78
 mozjs102
+mozjs115
+mozjs128
 ##mpfr
 mtr
 nano
@@ -116,6 +122,7 @@ openldap-client
 openssh
 openssl
 openssl10-solibs
+openssl11-solibs
 pam
 parted
 pciutils
