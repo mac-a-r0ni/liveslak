@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023  Eric Hameleers, Eindhoven, NL 
+# Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024  Eric Hameleers, Eindhoven, NL 
 # All rights reserved.
 #
 #   Permission to use, copy, modify, and distribute this software for
@@ -35,7 +35,7 @@
 # -----------------------------------------------------------------------------
 
 # Version of the Live OS generator:
-VERSION="1.8.1"
+VERSION="1.8.2"
 
 # Timestamp:
 THEDATE=$(date +%Y%m%d)
@@ -55,7 +55,7 @@ DEBUG=${DEBUG:-"NO"}
 
 # Set to "YES" in order to delete everything we have,
 # and rebuild any pre-existing .sxz modules from scratch:
-FORCE=${FORCE:-"NO"}
+FORCE=${FORCE:-"YES"}
 
 # Set to 32 to be more compatible with the specs. Slackware uses 4 by default:
 BOOTLOADSIZE=${BOOTLOADSIZE:-4}
@@ -73,7 +73,7 @@ SECUREBOOT=0
 
 # Which shim to download and install?
 # Supported are 'debian' 'fedora' 'opensuse'.
-SHIM_3RDP=${SHIM_3RDP:-"fedora"}
+SHIM_3RDP=${SHIM_3RDP:-"debian"}
 
 # When enabling SecureBoot support, we need a MOK certificate plus private key,
 # which we use to sign grub and kernel.
@@ -84,9 +84,11 @@ MOKCERT=""
 # to be defined through the '-S' parameter:
 MOKPRIVKEY=""
 
-# Set to NO if you want to use the non-SMP kernel on 32bit Slackware.
-# note: unsupported option since Slackware enabled preemption in 5.14.15.
-SMP32=${SMP32:-"YES"}
+# Set to YES if you want to use a SMP-tagged kernel package
+# on 32bit Slackware 15.0 or earlier.
+# In 32bit Slackware > 15.0 all kernels support preemption and the '-smp'
+# tag has been removed.
+SMP32=${SMP32:-"NO"}
 
 # Include support for NFS root (PXE boot), will increase size of the initrd:
 NFSROOTSUP=${NFSROOTSUP:-"YES"}
@@ -128,32 +130,26 @@ LIVEPW=${LIVEPW:-"live"}
 # The nvidia persistence account:
 NVUID=${NVUID:-"nvidia"}
 NVUIDNR=${NVUIDNR:-"365"}
-NVGRP=${NVFRP:-"nvidia"}
-NVGRPNR=${NVUIDNR:-"365"}
-
-# The colord account:
-CLRUID=${CLRUID:-"colord"}
-CLRUIDNR=${CLRUIDNR:-"303"}
-CLRGRP=${CLRGRP:-"colord"}
-CLRGRPNR=${CLRUIDNR:-"303"}
-
-# The avahi account:
-AVUID=${AVUID:-"avahi"}
-AVUIDNR=${AVUIDNR:-"214"}
-AVGRP=${AVGRP:-"avahi"}
-AVGRPNR=${AVUIDNR:-"214"}
+NVGRP=${NVGRP:-"nvidia"}
+NVGRPNR=${NVGRPNR:-"365"}
 
 # The flatpak account:
 FPUID=${FPUID:-"flatpak"}
 FPUIDNR=${FPUIDNR:-"372"}
 FPGRP=${FPGRP:-"flatpak"}
-FPGRPNR=${FPUIDNR:-"372"}
+FPGRPNR=${FPGRPNR:-"372"}
 
 # The tss account:
 TSUID=${TSUID:-"tss"}
 TSUIDNR=${TSUIDNR:-"374"}
 TSGRP=${TSGRP:-"tss"}
-TSGRPNR=${TSUIDNR:-"374"}
+TSGRPNR=${TSGRPNR:-"374"}
+
+# The rtkit account:
+RTUID=${RTUID:-"rtkit"}
+RTUIDNR=${RTUIDNR:-"378"}
+RTGRP=${RTGRP:-"rtkit"}
+RTGRPNR=${RTGRPNR:-"378"}
 
 # Custom name for the host:
 LIVE_HOSTNAME=${LIVE_HOSTNAME:-"darkstar"}
@@ -174,7 +170,7 @@ WAIT=${WAIT:-"5"}
 #
 
 # Who built the live image:
-BUILDER=${BUILDER:-"GFS Team/mac-a-r0ni"}
+BUILDER=${BUILDER:-"mac-a-r0ni/gfs"}
 
 # Console font to use with syslinux for better language support:
 CONSFONT=${CONSFONT:-"ter-i16v.psf"}
@@ -217,7 +213,7 @@ SL_ARCH=${SL_ARCH:-"x86_64"}
 # Root directory of a Slackware local mirror tree;
 # You can define custom repository location (must be in local filesystem)
 # for any module in the file ./pkglists/<module>.conf:
-SL_REPO=${SL_REPO:-"/home/liveslak-gfs45"}
+SL_REPO=${SL_REPO:-"/home/liveslak-gfs48"}
 DEF_SL_REPO=${SL_REPO}
 
 # The rsync URI of our default Slackware mirror server:
@@ -229,8 +225,8 @@ if [ "$(echo ${SL_VERSION}|cut -d. -f1)" == "14" ]; then
   # Slackware up and until 14.2 has KDE4 which includes the 'kdei' package set:
   SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,kdei,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
 else
-  # Exclude kde,xfce & many xap to keep the ISO size below DVD size:
-  SEQ_SLACKWARE="tagfile:a,ap,d,l,n,tcl,x,xap,y,gnome pkglist:slackextra,slackpkgplus"
+  # Exclude Emacs to keep the ISO size below DVD size:
+  SEQ_SLACKWARE="tagfile:a,ap,d,gnome,l,n,tcl,x,y,vm pkglist:slackextra"
 fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
@@ -268,7 +264,7 @@ SEQ_STUDW="tagfile:a,ap,d,e,f,k,kde,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra,sl
 # Package blacklists for variants:
 #BLACKLIST_DAW="seamonkey"
 #BLACKLIST_LEAN="seamonkey"
-BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars joe seamonkey glade nmap xterm pan rxvt-unicode MPlayer libdbusmenu-qt polkit-qt qt5 qt5-webkit qtkeychain hplip xsane"
+BLACKLIST_SLACKWARE="calligra calligraplan gcc-gdc gcc-gfortran gcc-gnat gcc-objc krita kstars joe seamonkey google-go-lang"
 #BLACKLIST_XFCE="gst-plugins-bad-free lynx mc motif mozilla-firefox pidgin xlockmore"
 
 # Potentially we will use package(s) from 'testing' instead of regular repo:
@@ -279,7 +275,7 @@ TESTINGLIST_DAW=""
 # List of kernel modules required for a live medium to boot properly;
 # Lots of HID modules added to support keyboard input for LUKS password entry;
 # Virtio modules added to experiment with liveslak in a VM.
-KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:hp_wmi:asus_wmi:virtio_net:wl:kvm:vhost-net"}
+KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
 
 # Network kernel modules to include for NFS root support:
 NETMODS="kernel/drivers/net kernel/drivers/virtio"
@@ -301,6 +297,9 @@ KAPPEND_STUDIOWARE="threadirqs preempt=full loglevel=3 audit=0"
 
 # Add CACert root certificates yes/no?
 ADD_CACERT=${ADD_CACERT:-"NO"}
+
+# GPG public key for Grub signing under Secure Boot:
+SB_GPG_PUBKEY="none"
 
 # Default language selection for the Live OS; 'en' means generic English.
 # This can be changed with the commandline switch "-l":
@@ -343,10 +342,10 @@ SQ_COMP=${SQ_COMP:-"xz"}
 LIVE_ROOTDIR=${LIVE_ROOTDIR:-"/mnt/slackwarelive"}
 
 # Directory where the live ISO image will be written:
-OUTPUT=${OUTPUT:-"/home/liveslak-gfs45"}
+OUTPUT=${OUTPUT:-"/home/liveslak-gfs48"}
 
 # Directory where we create the staging directory:
-TMP=${TMP:-"/home/liveslak-gfs45"}
+TMP=${TMP:-"/home/liveslak-gfs48"}
 
 # Toplevel directory of our staging area (this needs sufficient storage):
 LIVE_STAGING=${LIVE_STAGING:-"${TMP}/slackwarelive_staging"}
@@ -368,6 +367,17 @@ LIVE_MOD_ADD=${LIVE_MOD_ADD:-"${LIVE_STAGING}/${LIVEMAIN}/addons"}
 LIVE_MOD_OPT=${LIVE_MOD_OPT:-"${LIVE_STAGING}/${LIVEMAIN}/optional"}
 LIVE_MOD_COS=${LIVE_MOD_COS:-"${LIVE_STAGING}/${LIVEMAIN}/core2ram"}
 
+#
+# ---------------------------------------------------------------------------
+#
+
+# Internal variables:
+if which magick 1>/dev/null 2>/dev/null ; then
+  MAGICK="magick"
+else
+  MAGICK=""
+fi
+
 # ---------------------------------------------------------------------------
 # Define some functions.
 # ---------------------------------------------------------------------------
@@ -380,9 +390,10 @@ function cleanup() {
   umount ${LIVE_ROOTDIR}/sys 2>${DBGOUT} || true
   umount ${LIVE_ROOTDIR}/proc 2>${DBGOUT} || true
   umount ${LIVE_ROOTDIR}/dev 2>${DBGOUT} || true
-  umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+  lsof -l -n -t ${LIVE_ROOTDIR} |xargs -r kill -KILL || true
+  umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
   # Need to umount the squashfs modules too:
-  umount ${LIVE_WORK}/*_$$ 2>${DBGOUT} || true
+  umount -R ${LIVE_WORK}/*_$$ 2>${DBGOUT} || true
 
   rmdir ${LIVE_ROOTDIR} 2>${DBGOUT}
   rmdir ${LIVE_WORK}/*_$$ 2>${DBGOUT}
@@ -392,6 +403,17 @@ function cleanup() {
 } # End of cleanup()
 
 trap 'echo "*** $0 FAILED at line $LINENO ***"; cleanup; exit 1' ERR INT TERM
+
+# Slackware since September 2024 no longer has a kernel-modules package,
+# nor kernel-huge; all modules are added to the kernel-generic package:
+function find_modulespackage() {
+  local MYDIR=$1
+  if ls ${MYDIR}/var/log/packages/kernel*modules* 1>/dev/null 2>/dev/null; then
+    echo modules
+  else
+    echo generic
+  fi
+} # End of find_modulespackage()
 
 # Uncompress the initrd based on the compression algorithm used:
 function uncompressfs() {
@@ -419,7 +441,8 @@ function full_pkgname() {
     #  fi
     #done
     #echo "$FL"
-    echo "$(find ${TOPDIR}/ -name "${PACK}-*.t?z" 2>/dev/null |grep -E "\<${PACK//+/\\+}-[^-]+-[^-]+-[^-]+.t?z" |head -1)"
+    # Return the file with the most recent timestamp:
+    echo "$(find ${TOPDIR}/ -name "${PACK}-*.t?z" -exec ls -t {} + 2>/dev/null |grep -E "\<${PACK//+/\\+}-[^-]+-[^-]+-[^-]+.t?z" |head -1)"
   else
     echo ""
   fi
@@ -772,13 +795,19 @@ function gen_bootmenu() {
     -e "s/@C2RSH@/$C2RMS/g" \
     > ${MENUROOTDIR}/vesamenu.cfg
 
+  # Get us a more recent version of keytab-lilo:
+  if [ ! -x /usr/local/sbin/keytab-lilo-liveslak ]; then
+    wget -nv -O /usr/local/sbin/keytab-lilo-liveslak \
+      'https://repo.or.cz/syslinux.git/blob_plain/HEAD:/utils/keytab-lilo'
+    chmod 0755 /usr/local/sbin/keytab-lilo-liveslak
+  fi
   for LANCOD in $(cat ${LIVE_TOOLDIR}/languages |grep -Ev "(^ *#|^$)" |cut -d: -f1)
   do
     LANDSC=$(cat ${LIVE_TOOLDIR}/languages |grep "^$LANCOD:" |cut -d: -f2)
     KBD=$(cat ${LIVE_TOOLDIR}/languages |grep "^$LANCOD:" |cut -d: -f3)
     # First, create keytab files if they are missing:
     if [ ! -f ${MENUROOTDIR}/${KBD}.ktl ]; then
-      keytab-lilo $(find /usr/share/kbd/keymaps/i386 -name "us.map.gz") $(find /usr/share/kbd/keymaps/i386 -name "${KBD}.map.gz") > ${MENUROOTDIR}/${KBD}.ktl
+      keytab-lilo-liveslak $(find /usr/share/kbd/keymaps/i386 -name "us.map.gz") $(find /usr/share/kbd/keymaps/i386 -name "${KBD}.map.gz") > ${MENUROOTDIR}/${KBD}.ktl
     fi
     # Add this keyboard to the keyboard selection menu:
     cat <<EOL >> ${MENUROOTDIR}/kbd.cfg
@@ -854,6 +883,7 @@ function gen_uefimenu() {
   rm -f ${GRUBDIR}/kbd.cfg
   rm -f ${GRUBDIR}/lang.cfg
   rm -f ${GRUBDIR}/tz.cfg
+  rm -f ${GRUBDIR}/tz
 
   # Generate main grub.cfg:
   cat ${LIVE_TOOLDIR}/grub.tpl | sed \
@@ -908,7 +938,7 @@ menuentry "${LANDSC}" {
   export sl_kbd
   export sl_xkb
   export sl_lang
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -920,7 +950,7 @@ menuentry "${LANDSC}" {
   set sl_lang="$LANDSC"
   export sl_locale
   export sl_lang
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -944,20 +974,20 @@ EOL
     # First the submenu for this zone:
     cat <<EOL >> ${GRUBDIR}/tz.cfg
 submenu "${TZ} >" {
-  configfile \$prefix/${TZ}/tz.cfg
+  configfile \$cmdpath/tz/${TZ}/tz.cfg
 }
 
 EOL
     # Then the locations for this zone:
-    mkdir ${GRUBDIR}/${TZ}
+    mkdir -p ${GRUBDIR}/tz/${TZ}
     ( cd $TZDIR/$TZ
       find . -type f | xargs file | grep "timezone data" | cut -f 1 -d : | cut -f2- -d / | sort | while read LOCN ; do
         # Add this entry to the keyboard selection menu:
-        cat <<EOL >> ${GRUBDIR}/${TZ}/tz.cfg
+        cat <<EOL >> ${GRUBDIR}/tz/${TZ}/tz.cfg
 menuentry "${TZ}/${LOCN}" {
   set sl_tz="${TZ}/${LOCN}"
   export sl_tz
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -972,7 +1002,7 @@ EOL
 menuentry "${ZONE}" {
   set sl_tz="$ZONE"
   export sl_tz
-  configfile \$prefix/grub.cfg
+  configfile \$cmdpath/grub.cfg
 }
 
 EOL
@@ -1004,6 +1034,13 @@ function secureboot() {
   SHIM_VENDOR="$1"
   [ -z "${SHIM_VENDOR}" ] && SHIM_VENDOR="fedora"
 
+  GNUPGHOME="$2"
+  if [ -z "${GNUPGHOME}" ] || [ ! -d ${GNUPGHOME} ]; then
+    echo "** GNUPGHOME not correctly set in 'secureboot()'! Exiting..."
+    exit 99
+  fi
+  export GNUPGHOME
+
   case $SHIM_VENDOR in
     opensuse)      GRUB_SIGNED="grub.efi"
                    ;;
@@ -1013,8 +1050,8 @@ function secureboot() {
   mkdir -p ${LIVE_WORK}/shim
   cd ${LIVE_WORK}/shim
 
-  echo "-- Signing grub+kernel with '${LIVE_STAGING}/EFI/BOOT/liveslak.pem'."
-  # Sign grub:
+  echo "-- Signing grub+kernel with '${LIVE_STAGING}/EFI/BOOT/liveslak.der'."
+  # Sign grub and kernel:
   # The Grub EFI image must be renamed appropriately for shim to find it,
   # since some distros change the default 'grubx64.efi' filename:
   mv -i ${LIVE_STAGING}/EFI/BOOT/bootx64.efi \
@@ -1028,10 +1065,27 @@ function secureboot() {
     --output ${LIVE_STAGING}/boot/generic \
     ${LIVE_WORK}/shim/generic.unsigned 
 
+  echo "-- Signing kernel, initrd, theme and config files with GPG."
+  # When Grub runs under Secure Boot, it checks for valid GPG signatures
+  # for every file it loads.
+  # Remember, we created an ephemeral passwordless GPG key:
+  for MYFILE in \
+    ${LIVE_STAGING}/EFI/BOOT/liveslak/* \
+    ${LIVE_STAGING}/EFI/BOOT/tz/*/* \
+    ${LIVE_STAGING}/EFI/BOOT/*.cfg \
+    ${LIVE_STAGING}/EFI/BOOT/*.txt \
+    ${LIVE_STAGING}/boot/generic \
+    ${LIVE_STAGING}/boot/initrd.img \
+    ${LIVE_STAGING}/boot/memtest
+  do
+    rm -f ${MYFILE}.sig
+    gpg2 --batch --detach-sign ${MYFILE}
+  done
+
   if [ "${SHIM_VENDOR}" = "fedora" ]; then
     # The version of Fedora's shim package - always use the latest!
-    SHIM_MAJVER=15.6
-    SHIM_MINVER=2
+    SHIM_MAJVER=15.8
+    SHIM_MINVER=3
     SHIMSRC="https://kojipkgs.fedoraproject.org/packages/shim/${SHIM_MAJVER}/${SHIM_MINVER}/x86_64/shim-x64-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from Fedora."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1046,8 +1100,8 @@ function secureboot() {
     #install -D -m0644 boot/efi/EFI/BOOT/fbx64.efi \
     #  ${LIVE_STAGING}/EFI/BOOT/fbx64.efi
   elif [ "${SHIM_VENDOR}" = "opensuse" ]; then
-    SHIM_MAJVER=15.4
-    SHIM_MINVER=6.1
+    SHIM_MAJVER=15.8
+    SHIM_MINVER=3.1
     SHIMSRC="https://download.opensuse.org/repositories/openSUSE:/Factory/standard/x86_64/shim-${SHIM_MAJVER}-${SHIM_MINVER}.x86_64.rpm"
     echo "-- Downloading/installing the SecureBoot signed shim from openSUSE."
     wget -q --progress=dot:mega --show-progress ${SHIMSRC} -O - \
@@ -1062,9 +1116,9 @@ function secureboot() {
     #install -D -m0644 usr/share/efi/x86_64/fallback.efi \
     #  ${LIVE_STAGING}/EFI/BOOT/fallback.efi
   elif [ "${SHIM_VENDOR}" = "debian" ]; then
-    DEBSHIM_VER=1.40
+    DEBSHIM_VER=1.44
     DEBMOKM_VER=1
-    SHIM_MAJVER=15.7
+    SHIM_MAJVER=15.8
     SHIM_MINVER=1
     SHIMSRC="http://ftp.de.debian.org/debian/pool/main/s/shim-signed/shim-signed_${DEBSHIM_VER}+${SHIM_MAJVER}-${SHIM_MINVER}_amd64.deb"
     MOKMSRC="http://ftp.de.debian.org/debian/pool/main/s/shim-helpers-amd64-signed/shim-helpers-amd64-signed_${DEBMOKM_VER}+${SHIM_MAJVER}+${SHIM_MINVER}_amd64.deb"
@@ -1102,6 +1156,7 @@ function secureboot() {
 
   # Cleanup:
   rm -rf ${LIVE_WORK}/shim
+  rm -rf ${GNUPGHOME}
 
 } # End of secureboot()
 
@@ -1131,7 +1186,7 @@ function create_iso() {
 
   # Time to determine the output filename, now that we know all the variables
   # and ensured that the OUTPUT directory exists:
-  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}.iso"}
+  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}-gfs48.iso"}
   if [ "$USEXORR" = "NO" ]; then
     mkisofs -o "${OUTFILE}" \
       -V "${MEDIALABEL}" \
@@ -1215,36 +1270,36 @@ function plasma5_custom_bg() {
   echo "-- Configuring ${LIVEDE} custom background image."
   # First convert our image into a JPG in the liveslak directory:
   mkdir -p ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}
-  convert ${LIVE_TOOLDIR}/media/${LIVEDE,,}/bg/background.* ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg
+  ${MAGICK:-convert} ${LIVE_TOOLDIR}/media/${LIVEDE,,}/bg/background.* ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg
 
   # Create a Plasma5 desktop wallpaper set with a lowercase LIVEDE name:
   mkdir -p ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images
 
   # Create set of images for common aspect ratios like 16:9, 16:10 and 4:3:
   # Aspect Ratio 16:9 :
-  convert ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 1920x1080 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1920x1080.jpg
-  convert ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x2880 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/5120x2880.jpg
   # Aspect Ratio 16:10 :
-  convert  ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x - | \
-    convert - -geometry 1920x1200^ -gravity center -crop 1920x1200+0+0 \
+    ${MAGICK:-convert} - -geometry 1920x1200^ -gravity center -crop 1920x1200+0+0 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1920x1200.jpg
-  convert  ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x - | \
-    convert - -geometry 1280x800^ -gravity center -crop 1280x800+0+0 \
+    ${MAGICK:-convert} - -geometry 1280x800^ -gravity center -crop 1280x800+0+0 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1280x800.jpg
   # Aspect Ratio 4:3 :
-  convert  ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 5120x - | \
-    convert - -geometry 1024x768^ -gravity center -crop 1024x768+0+0 \
+    ${MAGICK:-convert} - -geometry 1024x768^ -gravity center -crop 1024x768+0+0 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/images/1024x768.jpg
 
   # Create the required wallpaper screenshot of 400x225 px (16:9 aspect ratio):
-  convert ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
+  ${MAGICK:-convert} ${LIVE_ROOTDIR}/usr/share/${LIVEMAIN}/${LIVEDE,,}/background.jpg \
     -resize 400x225 \
     ${LIVE_ROOTDIR}/usr/share/wallpapers/${LIVEDE,,}/contents/screenshot.png
 
@@ -1533,9 +1588,9 @@ DEF_SL_PATCHROOT=${SL_PATCHROOT}
 # Are all the required add-on tools present?
 [ "$USEXORR" = "NO" ] && ISOGEN="mkisofs isohybrid" || ISOGEN="xorriso"
 PROG_MISSING=""
-REQTOOLS="mksquashfs unsquashfs grub-mkfont grub-mkimage syslinux $ISOGEN installpkg upgradepkg keytab-lilo rsync wget mkdosfs"
+REQTOOLS="mksquashfs unsquashfs grub-mkfont grub-mkimage grub-mkstandalone syslinux $ISOGEN installpkg upgradepkg keytab-lilo rsync wget mkdosfs"
 if [ $SECUREBOOT -eq 1 ]; then
-   REQTOOLS="${REQTOOLS} openssl sbsign"
+   REQTOOLS="${REQTOOLS} gpg2 openssl sbsign"
 fi
 for PROGN in ${REQTOOLS} ; do
   if ! which $PROGN 1>/dev/null 2>/dev/null ; then
@@ -1556,7 +1611,7 @@ if ! echo ${SQ_COMP_AVAIL} | grep -wq ${SQ_COMP} ; then
   exit 1
 else
   # Test whether the local squashfs-tools support the compressor:
-  if ! mksquashfs 2>&1 | grep -Ewq "^[[:space:]]*${SQ_COMP}" ; then
+  if ! mksquashfs -help-section compression 2>&1 | grep -Ewq "^[[:space:]]*${SQ_COMP}" ; then
     echo "-- Compressor '${SQ_COMP}' not supported by your 'mksquashfs'!"
     echo "-- Select another one from '${SQ_COMP_AVAIL}'"
     exit 1
@@ -1591,7 +1646,7 @@ else
 fi
 
 # Determine additional boot parameters to be added:
-if [ -z ${KAPPEND} ]; then
+if [ -z "${KAPPEND}" ]; then
   eval KAPPEND=\$KAPPEND_${LIVEDE}
 fi
 
@@ -1626,7 +1681,7 @@ fi
 if [ "$FORCE" = "YES" ]; then
   echo "-- Removing old files and directories!"
   umount ${LIVE_ROOTDIR}/{proc,sys,dev} 2>${DBGOUT} || true
-  umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+  umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
   rm -rf ${LIVE_STAGING}/${LIVEMAIN} ${LIVE_WORK} ${LIVE_ROOTDIR}
 fi
 
@@ -1730,21 +1785,22 @@ for SPS in ${SL_SERIES} ; do
     echo "${THEDATE} (${BUILDER})" > ${INSTDIR}/${MARKER}
 
     echo "-- Installing the '${SPS}' series."
-    umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+    umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
     mount -t overlay -o lowerdir=${RODIRS},upperdir=${INSTDIR},workdir=${LIVE_OVLDIR} overlay ${LIVE_ROOTDIR}
 
     # Install the package series:
     install_pkgs ${SPS} ${LIVE_ROOTDIR} ${MTYPE}
-    umount ${LIVE_ROOTDIR} || true
+    umount -R ${LIVE_ROOTDIR} || true
 
     if [ "$SPS" = "a" -a "$CORE2RAM" = "NO" ] || [ "$SPS" = "${MINLIST}" ]; then
 
       # We need to take care of a few things first:
+      KPKGDET=$(find_modulespackage $INSTDIR)
       if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
-        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*modules* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*${KPKGDET}* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
         KVER=$(ls --indicator-style=none ${INSTDIR}/lib/modules/ |grep -v smp |head -1)
       else
-        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*modules* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+        KGEN=$(ls --indicator-style=none ${INSTDIR}/var/log/packages/kernel*${KPKGDET}* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
         KVER=$(ls --indicator-style=none ${INSTDIR}/lib/modules/ |grep smp |head -1)
       fi
       if [ -z "$KVER" ]; then
@@ -1752,6 +1808,15 @@ for SPS in ${SL_SERIES} ; do
         cleanup
         exit 1
       else
+        # Do we use old style (vmlinuz-generic-$KGEN) or one of the new styles
+        # (vmlinuz-$KGEN-generic or vmlinux-$KGEN) kernel image name?
+        if [ -f ${INSTDIR}/boot/vmlinuz-${KGEN} ]; then
+           KIMGNAME_STYLE="NEW2"
+        elif [ -f ${INSTDIR}/boot/vmlinuz-${KGEN}-generic ]; then
+           KIMGNAME_STYLE="NEW1"
+        else
+           KIMGNAME_STYLE="OLD"
+        fi
         # Move the content of the /boot directory out of the minimal system,
         # this will be joined again using overlay:
         rm -rf ${LIVE_BOOT}/boot
@@ -1804,15 +1869,16 @@ mkdir -p ${INSTDIR}
 echo "-- Configuring the base system."
 # -------------------------------------------------------------------------- #
 
-umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
 mount -t overlay -o lowerdir=${RODIRS},upperdir=${INSTDIR},workdir=${LIVE_OVLDIR} overlay ${LIVE_ROOTDIR}
 
 # Determine the kernel version in the Live OS:
+KPKGDET=$(find_modulespackage $LIVE_ROOTDIR)
 if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep -v smp |head -1)
 else
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep smp |head -1)
 fi
 
@@ -1922,6 +1988,29 @@ none      /           tmpfs       defaults   1   1
 
 EOT
 
+# Pipewire 1.0.0 is capable of replacing pulseaudio and jack2:
+if chroot ${LIVE_ROOTDIR} /usr/bin/pkg-config libpipewire-0.3 --atleast-version=1
+then
+  # Make pipewire the default, kill pulseaudio:
+  if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
+    echo "-- Enabling pipewire"
+    chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
+  fi
+  # Add configuration tweaks for the user:
+  # We default to using a 48000 Hz sample rate throughout:
+  mkdir -p ${LIVE_ROOTDIR}/etc/skel/.config/pipewire/pipewire-pulse.conf.d/
+  cat <<EOT > ${LIVE_ROOTDIR}/etc/skel/.config/pipewire/pipewire-pulse.conf.d/liveslak.conf
+pulse.properties = {
+    pulse.min.req          = 256/48000
+    pulse.min.frag         = 256/48000
+    pulse.min.quantum      = 256/48000
+}
+stream.properties = {
+    node.latency = 1024/48000
+}
+EOT
+fi
+
 # Prevent loop devices (sxz modules) from appearing in filemanagers:
 mkdir -p ${LIVE_ROOTDIR}/etc/udev/rules.d
 cat <<EOL > ${LIVE_ROOTDIR}/etc/udev/rules.d/11-local.rules
@@ -1940,19 +2029,17 @@ if ! echo "root:${ROOTPW}" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null; 
   echo "root:${ROOTPW}" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
 fi
 
-# Create group and user for the avahi/colord/nvidia persistence daemon:
+# Create group and user for the nvidia persistence daemon:
 if ! chroot ${LIVE_ROOTDIR} /usr/bin/getent passwd ${NVUID} > /dev/null 2>&1 ;
 then
-  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${AVGRPNR} ${AVGRP}
-  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "Avahi User" -u ${AVUIDNR} -g ${AVGRPNR} -d /dev/null -s /bin/false ${AVUID}
-  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${CLRGRPNR} ${CLRGRP}
-  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${CLRUIDNR} -g ${CLRGRPNR} -d /var/lib/${CLRGRP} -s /bin/false ${CLRUID}
   chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${NVGRPNR} ${NVGRP}
   chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "Nvidia persistence" -u ${NVUIDNR} -g ${NVGRPNR} -d /dev/null -s /bin/false ${NVUID}
   chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${FPGRPNR} ${FPGRP}
   chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${FPUIDNR} -g ${FPGRPNR} -d /var/lib/${FPGRP} -s /bin/false ${FPUID}
   chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${TSGRPNR} ${TSGRP}
   chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "TSS/TPM Agent" -u ${TSUIDNR} -g ${TSGRPNR} -d /dev/null -s /sbin/nologin ${TSUID}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${RTGRPNR} ${RTGRP}
+  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${RTUIDNR} -g ${RTGRPNR} -d /var/lib/${RTGRP} -s /bin/false ${RTUID}
 
 #  chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -u ${TSUIDNR} -g ${TSGRPNR} -d /home/${TSGRP} -s /bin/bash ${TSUID}
 
@@ -2072,14 +2159,26 @@ termcap  vt100* ms:AL=\E[%dL:DL=\E[%dM:UP=\E[%dA:DO=\E[%dB:LE=\E[%dD:RI=\E[%dC
 terminfo vt100* ms:AL=\E[%p1%dL:DL=\E[%p1%dM:UP=\E[%p1%dA:DO=\E[%p1%dB:LE=\E[%p1%dD:RI=\E[%p1%dC
 termcapinfo linux C8
 
-# Tabbed colored hardstatus line
-hardstatus alwayslastline
-hardstatus string '%{= Kd} %{= Kd}%-w%{= Kr}[%{= KW}%n %t%{= Kr}]%{= Kd}%+w %-= %{KG} %H%{KW}|%{KY}%101`%{KW}|%D %M %d %Y%{= Kc} %C%A%{-}'
 # Hide hardstatus: ctrl-a f
 bind f eval "hardstatus ignore"
 # Show hardstatus: ctrl-a F
 bind F eval "hardstatus alwayslastline"
+
+# Tabbed colored hardstatus line
+hardstatus alwayslastline
 EOT
+if [ "${SL_VERSION}" != "current" ]; then
+  cat <<"EOT" >> ${LIVE_ROOTDIR}/etc/skel/.screenrc
+hardstatus string '%{= Kd} %{= Kd}%-w%{= Kr}[%{= KW}%n %t%{= Kr}]%{= Kd}%+w %-= %{KG} %H%{KW}|%{KY}%101`%{KW}|%D %M %d %Y%{= Kc} %C%A%{-}'
+EOT
+else
+  cat <<"EOT" >> ${LIVE_ROOTDIR}/etc/skel/.screenrc
+truecolor on
+hardstatus off
+hardstatus string '%{= .;#999999} %{= .;#999999}%-w%{= #ff0000;#999999}[%{= #ffffff;#999999}%n %t%{= #ff0000;#999999}]%{= .;#999999}%+w %-= %{#00ff00;#999999} %H%{#ffffff;#999999}|%{#ffff00;#999999}%101`%{#ffffff;#999999}|%D %M %d %Y%{= #00ffff;#999999} %c%{-}'
+EOT
+fi
+
 # Give root a copy:
 cat ${LIVE_ROOTDIR}/etc/skel/.screenrc > ${LIVE_ROOTDIR}/root/.screenrc
 
@@ -2152,45 +2251,17 @@ WGETOPTS="--timeout=20 --tries=2"
 GREYLIST=on
 STRICTGPG=on
 SEARCH_CLOG_INPARENT=on
-PKGS_PRIORITY=( gnome slackware64 )
+PKGS_PRIORITY=( gnome )
 REPOPLUS=( gnome slackpkgplus )
-MIRRORPLUS['slackpkgplus']=http://slakfinder.org/slackpkg+/
-MIRRORPLUS['gnome']=https://reddoglinux.ddns.net/linux/gnome/45.x/x86_64/
+MIRRORPLUS['slackpkgplus']=http://slackware.nl/slackpkgplus/
+MIRRORPLUS['gnome']=https://reddoglinux.ddns.net/linux/gnome/48.x/x86_64/
+# mirror of gfs repo if you have issues with main
+# only uncomment one repo!
+#MIRRORPLUS['gnome']=https://slackware.lngn.net/pub/x86_64/slackware64-current/gfs48/
 EOPL
-  # Use the appropriate ktown variant:
-  eval $( grep "^ *VARIANT=" ${LIVE_TOOLDIR}/pkglists/ktown.conf)
-  if [ "$VARIANT" = "testing" ]; then
-    cat <<EOPL >> etc/slackpkg/slackpkgplus.conf
-#MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/latest/${SL_ARCH}/
-MIRRORPLUS['ktown']=http://slackware.nl/alien-kde/${SL_VERSION}/testing/${SL_ARCH}/
-EOPL
-fi
-
-# add slackpkg+ blacklist for gnome ensuring we don't end up install-new-ing kde & xfce package sets
-# and/or the kernel packages
-if [ -f var/log/packages/slackpkg+-* ] ; then
   cat <<EOPL > etc/slackpkg/greylist
-cairo.*
-gjs.*
-gnome-keyring.*
-libgtop.*
-libhandy.*
-librsvg.*
+cairo
 EOPL
-  fi
-if [ -f var/log/packages/slackpkg+-* ] ; then
-  cat <<EOPL > etc/slackpkg/blacklist
-at-spi2-atk.*
-cairomm1.*
-glibmm2.*
-gtkmm4.*
-mm-common.*
-kernel-source.*
-pangomm2.*
-kde/
-xfce/
-EOPL
-  fi
 fi
 
 # Slackpkg wants you to opt-in on slackware-current:
@@ -2387,11 +2458,11 @@ else
   # Use the default Slackware blue 'S':
   FACE_ICON="${LIVE_TOOLDIR}/blueSW-64px.png"
 fi
-convert ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/home/${LIVEUID}/.face.icon
+${MAGICK:-convert} ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/home/${LIVEUID}/.face.icon
 chown --reference=${LIVE_ROOTDIR}/home/${LIVEUID} ${LIVE_ROOTDIR}/home/${LIVEUID}/.face.icon
 ( cd ${LIVE_ROOTDIR}/home/${LIVEUID}/ ; ln .face.icon .face )
 mkdir -p ${LIVE_ROOTDIR}/usr/share/apps/kdm/pics/users
-convert ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/usr/share/apps/kdm/pics/users/blues.icon
+${MAGICK:-convert} ${FACE_ICON} -resize 64x64 - >${LIVE_ROOTDIR}/usr/share/apps/kdm/pics/users/blues.icon
 
 # Give XDM a nicer look:
 mkdir -p ${LIVE_ROOTDIR}/etc/X11/xdm/liveslak-xdm
@@ -2470,7 +2541,7 @@ install -m 0644 ${LIVE_TOOLDIR}/media/slackware/icons/graySW_512px.png \
 #Type=Directory
 #EOT
 cat <<EOT > ${LIVE_ROOTDIR}/usr/share/applications/setup2hd.desktop
-#!/usr/bin/env xdg-open
+#!/usr/bin/env gnome-terminal
 [Desktop Entry]
 Type=Application
 Terminal=true
@@ -2493,6 +2564,17 @@ echo "-- Configuring GNOME."
 mkdir -p ${LIVE_ROOTDIR}/etc/skel/
 for SKEL in ${LIVE_TOOLDIR}/skel/skel*.txz ; do
   tar -xf ${SKEL} -C ${LIVE_ROOTDIR}/etc/skel/
+
+# Do not show the blueman applet, Gnome3 has its own BlueTooth widget:
+echo "NotShowIn=GNOME;" >> ${LIVE_ROOTDIR}/etc/xdg/autostart/blueman.desktop
+
+# Do not start gnome-initial-setup:
+mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/.config
+touch ${LIVE_ROOTDIR}/home/${LIVEUID}/.config/gnome-initial-setup-done
+# ensure nautilus opens when supposed to:
+if [ -x /usr/bin/nautilus ]; then
+  /usr/bin/xdg-mime default org.gnome.Nautilus.desktop inode/directory >/dev/null 2>${DBGOUT}
+fi
 done
 
 if [ "$LIVEDE" = "XFCE" ]; then
@@ -2835,12 +2917,6 @@ setenv GDK_BACKEND x11
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
 
-# Make pipewire the default, kill pulseaudio:
-if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
-  echo "-- Enabling pipewire"
-  chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
-fi
-
 # Ensure that color Emojis work in Qt applications:
 mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
 cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-emoji.conf:
@@ -3063,7 +3139,7 @@ then
       cat <<EOT > ${LIVE_ROOTDIR}/etc/security/limits.d/rt_audio.conf
 # Realtime capability allowed for user in the 'audio' group:
 # Use 'unlimited' with care, you can lock up your system when app misbehaves:
-#@audio   -  memlock    2097152
+#@audio   -  memlock    4194304
 @audio   -  memlock    unlimited
 @audio   -  rtprio     95
 EOT
@@ -3229,19 +3305,7 @@ echo "-- Tweaking system startup."
 # -------------------------------------------------------------------------- #
 
 # Configure the default DE when running startx:
-if [ "$LIVEDE" = "MATE" ]; then
-  ln -sf xinitrc.mate-session ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ "$LIVEDE" = "CINNAMON" ]; then
-  ln -sf xinitrc.cinnamon-session ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ "$LIVEDE" = "DLACK" ]; then
   ln -sf xinitrc.gnome ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.gnome ]; then
-  ln -sf xinitrc.gnome ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.kde ]; then
-  ln -sf xinitrc.kde ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-elif [ -f ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc.xfce ]; then
-  ln -sf xinitrc.xfce ${LIVE_ROOTDIR}/etc/X11/xinit/xinitrc
-fi
 
 # Configure the default runlevel:
 sed -i ${LIVE_ROOTDIR}/etc/inittab -e "s/\(id:\).\(:initdefault:\)/\1${RUNLEVEL}\2/"
@@ -3380,18 +3444,6 @@ if [ -x /usr/bin/nvidia-modprobe ]; then
   /usr/bin/nvidia-modprobe -c 0 -u
 fi
 
-# Start avahi daemon:
-if [ -x /etc/rc.d/rc.avahidaemon ]; then
-  echo "Starting Avahi Daemon..."
-  /etc/rc.d/rc.avahidaemon start
-fi
-
-# Start avahidnsconfd:
-if [ -x /etc/rc.d/rc.avahidnsconfd ]; then
-  echo "Starting Avahi DNS Confd..."
-  /etc/rc.d/rc.avahidnsconfd start
-fi
-
 # Start the nvidia-persistenced daemon:
 if  [ -x /etc/rc.d/rc.nvidia-persistenced ] && [ -d /var/run/nvidia-persistenced ]; then
   echo "Starting nvidia persistence daemon..."
@@ -3399,27 +3451,29 @@ if  [ -x /etc/rc.d/rc.nvidia-persistenced ] && [ -d /var/run/nvidia-persistenced
   chown ${NVUID}:${NVGRP} /var/run/nvidia-persistenced 2>/dev/null
   /etc/rc.d/rc.nvidia-persistenced start
 fi
+
+# Start the openrc-settingsd daemon:
+if  [ -x /etc/rc.d/rc.openrc-settingsd ]; then
+  echo "Starting openrc-settingsd daemon..."
+  /etc/rc.d/rc.openrc-settingsd start
+fi
+
 EOT
 
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/rc.d/rc.local_shutdown
-
-# Stop avahidnsconfd
-if [ -x /etc/rc.d/rc.avahidnsconfd ]; then
-  echo "Stopping Avahi DNS Confd..."
-  /etc/rc.d/rc.avahidnsconfd stop
-fi
-
-# Stop avahidaemon
-if [ -x /etc/rc.d/rc.avahidaemon ]; then
-  echo "Stopping Avahi Daemon..."
-  /etc/rc.d/rc.avahidaemon stop
-fi
 
 # Stop the nvidia-persistenced daemon:
 if  [ -x /etc/rc.d/rc.nvidia-persistenced ]; then
   echo "Stopping nvidia persistence daemon..."
   /etc/rc.d/rc.nvidia-persistenced stop
 fi
+
+# Stop the openrc-settingsd daemon:
+if  [ -x /etc/rc.d/rc.openrc-settingsd ]; then
+  echo "Stoping openrc-settingsd daemon..."
+  /etc/rc.d/rc.openrc-settingsd stop
+fi
+
 EOT
 
 # Clean out the unneeded stuff:
@@ -3436,6 +3490,10 @@ if [ -x ${LIVE_ROOTDIR}/etc/cron.daily/mlocate ]; then
 else
   LOCATE_BIN=slocate
 fi
+# Mlocate needs a mounted /proc in the chroot:
+if ! mount | grep -q 'on ${LIVE_ROOTDIR}/proc' ; then
+  mount --bind /proc ${LIVE_ROOTDIR}/proc
+fi
 chroot ${LIVE_ROOTDIR} /etc/cron.daily/${LOCATE_BIN} 2>${DBGOUT}
 
 # -----------------------------------------------------------------------------
@@ -3443,7 +3501,7 @@ chroot ${LIVE_ROOTDIR} /etc/cron.daily/${LOCATE_BIN} 2>${DBGOUT}
 # -----------------------------------------------------------------------------
 
 # Squash the configuration into its own module:
-umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
 mksquashfs ${INSTDIR} ${LIVE_MOD_SYS}/0099-${DISTRO}_zzzconf-${SL_VERSION}-${SL_ARCH}.sxz -noappend -comp ${SQ_COMP} ${SQ_COMP_PARAMS}
 rm -rf ${INSTDIR}/*
 
@@ -3463,7 +3521,7 @@ unset INSTDIR
 # -----------------------------------------------------------------------------
 
 echo "-- Preparing the system for live booting."
-umount ${LIVE_ROOTDIR} 2>${DBGOUT} || true
+umount -R ${LIVE_ROOTDIR} 2>${DBGOUT} || true
 mount -t overlay -o lowerdir=${RODIRS%:*},upperdir=${LIVE_BOOT},workdir=${LIVE_OVLDIR} overlay ${LIVE_ROOTDIR}
 
 mount --bind /proc ${LIVE_ROOTDIR}/proc
@@ -3471,11 +3529,12 @@ mount --bind /sys ${LIVE_ROOTDIR}/sys
 mount --bind /dev ${LIVE_ROOTDIR}/dev
 
 # Determine the installed kernel version:
+KPKGDET=$(find_modulespackage $LIVE_ROOTDIR)
 if [ "$SL_ARCH" = "x86_64" -o "$SMP32" = "NO" ]; then
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep -v smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep -v smp |head -1)
 else
-  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*modules* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
+  KGEN=$(ls --indicator-style=none ${LIVE_ROOTDIR}/var/log/packages/kernel*${KPKGDET}* |grep smp |head -1 |rev | cut -d- -f3 |tr _ - |rev)
   KVER=$(ls --indicator-style=none ${LIVE_ROOTDIR}/lib/modules/ |grep smp |head -1)
 fi
 
@@ -3572,8 +3631,11 @@ fi
 rm -rf ${LIVE_ROOTDIR}/boot/initrd-tree
 
 # ... and cleanup these mounts again:
+# Also, prevent a 'target is busy' error while unmounting.
+# because gpg-agent/keyboxd/scdaemon were activated and keep the mount open:
+lsof -l -n -t ${LIVE_ROOTDIR} |xargs -r kill -KILL
 umount ${LIVE_ROOTDIR}/{proc,sys,dev} || true
-umount ${LIVE_ROOTDIR} || true
+umount -R ${LIVE_ROOTDIR} || true
 # Paranoia:
 [ ! -z "${LIVE_BOOT}" ] && rm -rf ${LIVE_BOOT}/{etc,tmp,usr,var} 1>${DBGOUT} 2>${DBGOUT}
 
@@ -3581,7 +3643,15 @@ umount ${LIVE_ROOTDIR} || true
 # Note to self: syslinux does not 'see' files unless they are DOS 8.3 names?
 rm -rf ${LIVE_STAGING}/boot
 mkdir -p ${LIVE_STAGING}/boot
-cp -a ${LIVE_BOOT}/boot/vmlinuz-generic*-$KGEN ${LIVE_STAGING}/boot/generic
+# Do we use old style (vmlinuz-generic-$KGEN) or one of the new styles
+# (vmlinuz-$KGEN-generic or vmlinux-$KGEN) kernel image name?
+if [ -f ${LIVE_BOOT}/boot/vmlinuz-${KGEN} ]; then
+  cp -a ${LIVE_BOOT}/boot/vmlinuz-${KGEN} ${LIVE_STAGING}/boot/generic
+elif [ -f ${LIVE_BOOT}/boot/vmlinuz-${KGEN}-generic ]; then
+  cp -a ${LIVE_BOOT}/boot/vmlinuz-${KGEN}-generic ${LIVE_STAGING}/boot/generic
+else
+  cp -a ${LIVE_BOOT}/boot/vmlinuz-generic*-${KGEN} ${LIVE_STAGING}/boot/generic
+fi
 mv ${LIVE_BOOT}/boot/initrd_${KVER}.img ${LIVE_STAGING}/boot/initrd.img
 
 # Squash the boot directory into its own module:
@@ -3590,29 +3660,60 @@ mksquashfs ${LIVE_BOOT} ${LIVE_MOD_SYS}/0000-${DISTRO}_boot-${SL_VERSION}-${SL_A
 # Copy the syslinux configuration.
 # The next block checks here for a possible UEFI grub boot image:
 cp -a ${LIVE_TOOLDIR}/syslinux ${LIVE_STAGING}/boot/
+# We have memtest in the syslinux bootmenu:
+mv ${LIVE_STAGING}/boot/syslinux/memtest ${LIVE_STAGING}/boot/
 
 # EFI support always for 64bit architecture, but conditional for 32bit.
 if [ "$SL_ARCH" = "x86_64" -o "$EFI32" = "YES" ]; then
   # Copy the UEFI boot directory structure:
   rm -rf ${LIVE_STAGING}/EFI/BOOT
   mkdir -p ${LIVE_STAGING}/EFI/BOOT
-  cp -a ${LIVE_TOOLDIR}/EFI/BOOT/{grub-embedded.cfg,make-grub.sh,*.txt,theme} ${LIVE_STAGING}/EFI/BOOT/
+  cp -a ${LIVE_TOOLDIR}/EFI/BOOT/{grub-embedded.cfg,make-grub.sh,*.txt,liveslak} ${LIVE_STAGING}/EFI/BOOT/
+
   if [ ${SECUREBOOT} -eq 1 ]; then
     # User needs a DER-encoded copy of the signing cert for MOK enrollment:
     openssl x509 -outform der -in ${MOKCERT} -out ${LIVE_STAGING}/EFI/BOOT/liveslak.der
+    # Grub needs a GPG public key and we need the private key as well.
+    # This will be an ephemeral key.
+    # Key-type 1 is RSA (https://datatracker.ietf.org/doc/html/rfc4880#section-9.1):
+    echo "-- Generating ephemeral GPG key pair"
+    SB_GPG_PUBKEY=${LIVE_STAGING}/EFI/BOOT/liveslak.pub
+    export GNUPGHOME="$(mktemp -d -p /dev/shm liveslak-sb-XXXXXX)"
+    gpg2 --batch --gen-key <<EOF
+Key-Type: 1
+Key-Length: 4096
+Subkey-Type: 1
+Subkey-Length: 4096
+Name-Real: Slackware Secure Boot
+Name-Comment: Ephemeral key for Grub signature checking
+Name-Email: ca@slackware.nl
+Expire-Date: 0
+%no-protection
+%commit
+%echo Passwordless GPG key pair created.
+EOF
+  # Export the pubkey:
+  gpg2 -a --export "ca@slackware.nl" > ${SB_GPG_PUBKEY}
+  chmod 444 ${SB_GPG_PUBKEY}
+  echo "-- GPG key finferprint: $(gpg2 --show-keys --with-colons ${SB_GPG_PUBKEY} |grep fpr |head -1 |rev |cut -d: -f2 |rev)"
   fi
+
   if [ "$LIVEDE" = "XFCE" ]; then
     # We do not use the unicode font, so it can be removed to save space:
-    rm -f ${LIVE_STAGING}/EFI/BOOT/theme/unicode.pf2
+    rm -f ${LIVE_STAGING}/EFI/BOOT/liveslak/unicode.pf2
   fi
 
   # Create the grub fonts used in the theme.
   # Command outputs string like this: "Font name: DejaVu Sans Mono Regular 5".
-  for FSIZE in 5 10 12 20 24 ; do
+  echo "-- Generating GRUB fonts"
+  for FSIZE in 5 15 19 ; do
     grub-mkfont -s ${FSIZE} -av \
-      -o ${LIVE_STAGING}/EFI/BOOT/theme/dejavusansmono${FSIZE}.pf2 \
+      -o ${LIVE_STAGING}/EFI/BOOT/liveslak/dejavusansmono${FSIZE}.pf2 \
       /usr/share/fonts/TTF/DejaVuSansMono.ttf \
       | grep "^Font name: "
+    # Spam the root filesystem (no way around Secure Boot otherwise:
+    install -m0644 ${LIVE_STAGING}/EFI/BOOT/liveslak/dejavusansmono${FSIZE}.pf2 \
+      /usr/share/grub/
   done
 
   # The grub-embedded.cfg in the bootx64.efi/bootia32.efi looks for this file:
@@ -3624,11 +3725,15 @@ if [ "$SL_ARCH" = "x86_64" -o "$EFI32" = "YES" ]; then
       # Create a SBAT file 'grub_sbat.csv' to be used by make-grub.sh :
       cat <<HSBAT > ${LIVE_STAGING}/EFI/BOOT/grub_sbat.csv
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
-grub,1,Free Software Foundation,grub,2.06,https://www.gnu.org/software/grub/
+grub,3,Free Software Foundation,grub,2.12,https//www.gnu.org/software/grub/
 grub.liveslak,1,The liveslak project,grub,${GRUBVER}-${GRUBBLD},https://download.liveslak.org/
 HSBAT
       sed -i -e "s/SLACKWARELIVE/${MARKER}/g" grub-embedded.cfg
-      sh make-grub.sh EFIFORM=${EFIFORM} EFISUFF=${EFISUFF}
+      if [ ${SECUREBOOT} -eq 1 ]; then
+        gpg2 --batch --detach-sign grub-embedded.cfg
+      fi
+      # Hints taken from https://wiki.archlinux.org/title/GRUB/Tips_and_tricks
+      sh make-grub.sh EFIFORM=${EFIFORM} EFISUFF=${EFISUFF} GPGKEY=${SB_GPG_PUBKEY}
     )
   fi
 
@@ -3637,7 +3742,7 @@ HSBAT
 
   # Add SecureBoot support if requested:
   if [ ${SECUREBOOT} -eq 1 ]; then
-    secureboot ${SHIM_3RDP}
+    secureboot ${SHIM_3RDP} ${GNUPGHOME}
   fi
 
 fi # End EFI support menu.
@@ -3669,8 +3774,6 @@ for SLFILE in message.txt f2.txt syslinux.cfg lang.cfg ; do
 done
 # The iso2usb.sh script can use this copy of a MBR file as fallback:
 cp -a /usr/share/syslinux/gptmbr.bin ${LIVE_STAGING}/boot/syslinux/
-# We have memtest in the syslinux bootmenu:
-mv ${LIVE_STAGING}/boot/syslinux/memtest ${LIVE_STAGING}/boot/
 
 # Make use of proper console font if we have it available:
 if [ -f /usr/share/kbd/consolefonts/${CONSFONT}.gz ]; then

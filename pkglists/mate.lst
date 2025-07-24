@@ -5,7 +5,6 @@ glade
 graphviz
 gssdp
 gtk-engines
-gtk-layer-shell
 gtksourceview
 gtksourceview3
 gtksourceview4
@@ -14,6 +13,7 @@ libgksu
 libgtop
 libgxps
 libpeas
+libsoup3
 libunique
 libunique3
 libwnck3
