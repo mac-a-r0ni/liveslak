@@ -1,3 +1,16 @@
+Contents:
+
+Each branch is the base for whatever chopped & screwed liveslak ISO I create. Do I use it as intended? No. I use it how I use it, 
+because that's the way I use it. Say you want to build your own GFS liveslak, use the gfs branch, copy all the gnome packages from the gfs repo 
+into a dir under the slackware64-current/slackware64/ packages you have locally (you do have them locally don't you?) where the a, ap, d, e, f, etc.. folders 
+are, creating a "gnome" folder to put all the gfs packages into. Then, take the "gfs-tagfile" from the root folder here, rename it to "tagfile" 
+and place it into the gnome folder. Depending on the liveslak you are making, you may need to move another tagfile, or add additional 
+packages, that choice is yours. Good luck and keep in mind, these are unofficial modifications, and it should go without saying, but there's 
+no warranty implied. This stuff is basically for my personal use, so good luck!
+
+Original README is below....
+
+
 ====== Slackware Live Edition ======
 
 
