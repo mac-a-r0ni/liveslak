@@ -2415,8 +2415,6 @@ ALLOW32BIT=off
 USEBL=1
 WGETOPTS="--timeout=20 --tries=2"
 GREYLIST=off
-STRICTGPG=on
-SEARCH_CLOG_INPARENT=on
 PKGS_PRIORITY=( cosmic slackware64 )
 REPOPLUS=( cosmic )
 MIRRORPLUS['cosmic']=https://reddoglinux.ddns.net/linux/cosmic/x86_64/
