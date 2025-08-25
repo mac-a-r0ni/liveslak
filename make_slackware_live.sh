@@ -3,7 +3,7 @@
 # Copyright 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024  Eric Hameleers, Eindhoven, NL 
 # All rights reserved.
 #
-# Modifications for nwg-shell Copypasta 2023-2024 Jay Lanagan, Detroit, MI, USA.
+# Modifications for nwg-shell Copypasta 2023-2025 Jay Lanagan, Detroit, MI, USA.
 #
 #   Permission to use, copy, modify, and distribute this software for
 #   any purpose with or without fee is hereby granted, provided that
@@ -224,14 +224,14 @@ if [ "$(echo ${SL_VERSION}|cut -d. -f1)" == "14" ]; then
   # Slackware up and until 14.2 has KDE4 which includes the 'kdei' package set:
   SEQ_SLACKWARE="tagfile:a,ap,d,e,f,k,kde,kdei,l,n,t,tcl,x,xap,xfce,y pkglist:slackextra"
 else
-  # Exclude Emacs to keep the ISO size below DVD size, i removed 'slackextra' cuz why not
+  # Exclude Emacs to keep the ISO size below DVD size:
 #  SEQ_SLACKWARE="pkglist:${MINLIST},noxbase,x_base,xapbase,nwgbase,xfcebase tagfile:nwg,sbo pkglist:slackextra"
   SEQ_SLACKWARE="tagfile:a,ap,d,l,n,nwg,x,xap,y,sbo pkglist:slackextra"
 fi
 
 # Stripped-down Slackware with XFCE as the Desktop Environment:
 # - each series will become a squashfs module:
-SEQ_XFCEBASE="tagfile:nwg,sbo pkglist:${MINLIST},noxbase,x_base,xapbase,xfcebase,slackpkgplus"
+SEQ_XFCEBASE="pkglist:${MINLIST},noxbase,x_base,xapbase,xfcebase local:mcpp"
 
 # Stripped-down Base Slackware:
 SEQ_LEAN="pkglist:${MINLIST},noxbase,x_base,xapbase,xfcebase,slackpkgplus,z00_plasma5supp,z01_plasma5base,z01_swdev"
@@ -3067,9 +3067,16 @@ setenv GDK_BACKEND x11
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
 
-# Ensure that color Emojis work in Qt applications:
-mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
-cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-emoji.conf:
+  # Ensure that color Emojis work in Qt applications:
+  if [ -d ${LIVE_ROOTDIR}/etc/fonts/conf.avail ]; then
+    FONTFONFDIR="/etc/fonts/conf.avail"
+  elif [ -d ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail ]; then
+    FONTFONFDIR="/usr/share/fontconfig/conf.avail"
+  else
+    mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
+    FONTFONFDIR="/usr/share/fontconfig/conf.avail"
+  fi
+  cat <<EOT >${LIVE_ROOTDIR}${FONTFONFDIR}/99-noto-mono-color-emoji.conf
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig>
@@ -3093,6 +3100,7 @@ cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-em
   </alias>
 </fontconfig>
 EOT
+  unset FONTFONFDIR
 
   if [ "$LIVEDE" = "DAW" ] || [ "$LIVEDE" = "LEAN" ]; then
     # These lean installations do not support Wayland graphical sessions:
