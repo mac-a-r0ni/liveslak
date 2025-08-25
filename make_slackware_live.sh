@@ -2898,9 +2898,16 @@ setenv GDK_BACKEND x11
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
 
-# Ensure that color Emojis work in Qt applications:
-mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
-cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-emoji.conf:
+  # Ensure that color Emojis work in Qt applications:
+  if [ -d ${LIVE_ROOTDIR}/etc/fonts/conf.avail ]; then
+    FONTFONFDIR="/etc/fonts/conf.avail"
+  elif [ -d ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail ]; then
+    FONTFONFDIR="/usr/share/fontconfig/conf.avail"
+  else
+    mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
+    FONTFONFDIR="/usr/share/fontconfig/conf.avail"
+  fi
+  cat <<EOT >${LIVE_ROOTDIR}${FONTFONFDIR}/99-noto-mono-color-emoji.conf
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig>
@@ -2924,6 +2931,7 @@ cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-em
   </alias>
 </fontconfig>
 EOT
+  unset FONTFONFDIR
 
   if [ "$LIVEDE" = "DAW" ] || [ "$LIVEDE" = "LEAN" ]; then
     # These lean installations do not support Wayland graphical sessions:
