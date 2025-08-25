@@ -163,7 +163,7 @@ LIVE_HOSTNAME=${LIVE_HOSTNAME:-"cosmic-de"}
 RUNLEVEL=${RUNLEVEL:-4}
 
 # Use the graphical syslinux menu (YES or NO)?
-SYSMENU=${SYSMENU:-"NO"}
+SYSMENU=${SYSMENU:-"YES"}
 
 # The amount of seconds we want the init script to wait to give the kernel's
 # USB subsystem time to settle. The default value of mkinitrd is "1" which
@@ -812,7 +812,7 @@ function gen_bootmenu() {
     KBD=$(cat ${LIVE_TOOLDIR}/languages |grep "^$LANCOD:" |cut -d: -f3)
     # First, create keytab files if they are missing:
     if [ ! -f ${MENUROOTDIR}/${KBD}.ktl ]; then
-      keytab-lilo-liveslak $(find /usr/share/kbd/keymaps/i386 -name "us.map.gz") $(find /usr/share/kbd/keymaps/i386 -name "${KBD}.map.gz") > ${MENUROOTDIR}/${KBD}.ktl
+      /usr/local/sbin/keytab-lilo-liveslak $(find /usr/share/kbd/keymaps/i386 -name "us.map.gz") $(find /usr/share/kbd/keymaps/i386 -name "${KBD}.map.gz") > ${MENUROOTDIR}/${KBD}.ktl
     fi
     # Add this keyboard to the keyboard selection menu:
     cat <<EOL >> ${MENUROOTDIR}/kbd.cfg
@@ -2000,6 +2000,11 @@ then
   if [ -x ${LIVE_ROOTDIR}/usr/sbin/pipewire-enable.sh ]; then
     echo "-- Enabling pipewire"
     chroot ${LIVE_ROOTDIR} /usr/sbin/pipewire-enable.sh
+    # If you also want to make pipewire replace jack, do:
+    #echo "-- Removing Jack from system and enabling Pipewire emulation"
+    #chroot ${LIVE_ROOTDIR} /sbin/removepkg jack2
+    #mkdir -p ${LIVE_ROOTDIR}/etc/ld.so.conf.d
+    #echo "/usr/lib${LIBDIRSUFFIX}/pipewire-0.3/jack/" > ${LIVE_ROOTDIR}/etc/ld.so.conf.d/pipewire-jack.conf
   fi
   # Add configuration tweaks for the user:
   # We default to using a 48000 Hz sample rate throughout:
@@ -2904,12 +2909,17 @@ if [ -d ${LIVE_ROOTDIR}/usr/lib${DIRSUFFIX}/libexec/kf5 ] || [ -d ${LIVE_ROOTDIR
     -e s'#,preferred://browser##'
 
   # Set the OS name to "Slackware Live" in "System Information":
-  echo "Name=${DISTRO^} Live" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  if [ -f "${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc" ]; then
+    KDE_ABOUT_DISTRO="${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc"
+  else
+    KDE_ABOUT_DISTRO="${LIVE_ROOTDIR}/etc/xdg/kcm-about-distrorc"
+  fi
+  echo "Name=${DISTRO^} Live" >> ${KDE_ABOUT_DISTRO}
   # Use os-release's VERSION (default=false means: use VERSION_ID)
-  echo "UseOSReleaseVersion=true" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+  echo "UseOSReleaseVersion=true" >> ${KDE_ABOUT_DISTRO}
   if [ "${SL_VERSION}" = "current" ]; then
     # Some more detail on development release:
-    echo "Variant=Post-stable development (-current)" >> ${LIVE_ROOTDIR}/etc/kde/xdg/kcm-about-distrorc
+    echo "Variant=Post-stable development (-current)" >> ${KDE_ABOUT_DISTRO}
   fi
 
   # Set sane SDDM defaults on first boot (root-owned file):
@@ -3072,9 +3082,16 @@ setenv GDK_BACKEND x11
 EOT
   chmod 755 ${LIVE_ROOTDIR}/etc/profile.d/kwayland.*
 
-# Ensure that color Emojis work in Qt applications:
-mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
-cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-emoji.conf:
+  # Ensure that color Emojis work in Qt applications:
+  if [ -d ${LIVE_ROOTDIR}/etc/fonts/conf.avail ]; then
+    FONTFONFDIR="/etc/fonts/conf.avail"
+  elif [ -d ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail ]; then
+    FONTFONFDIR="/usr/share/fontconfig/conf.avail"
+  else
+    mkdir -p ${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail
+    FONTFONFDIR="/usr/share/fontconfig/conf.avail"
+  fi
+  cat <<EOT >${LIVE_ROOTDIR}${FONTFONFDIR}/99-noto-mono-color-emoji.conf
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig>
@@ -3098,6 +3115,7 @@ cat <<EOT >${LIVE_ROOTDIR}/usr/share/fontconfig/conf.avail/99-noto-mono-color-em
   </alias>
 </fontconfig>
 EOT
+  unset FONTFONFDIR
 
   if [ "$LIVEDE" = "DAW" ] || [ "$LIVEDE" = "LEAN" ]; then
     # These lean installations do not support Wayland graphical sessions:
@@ -3854,7 +3872,7 @@ EOF
   # Create the grub fonts used in the theme.
   # Command outputs string like this: "Font name: DejaVu Sans Mono Regular 5".
   echo "-- Generating GRUB fonts"
-  for FSIZE in 5 15 19 ; do
+  for FSIZE in 5 12 15 ; do
     grub-mkfont -s ${FSIZE} -av \
       -o ${LIVE_STAGING}/EFI/BOOT/liveslak/dejavusansmono${FSIZE}.pf2 \
       /usr/share/fonts/TTF/DejaVuSansMono.ttf \
