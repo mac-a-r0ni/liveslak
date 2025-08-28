@@ -151,13 +151,13 @@ GRDGRP=${GRDGRP:-"greeter"}
 GRDGRPNR=${GRDUIDNR:-"381"}
 
 # Custom name for the host:
-LIVE_HOSTNAME=${LIVE_HOSTNAME:-"nwg-slack"}
+LIVE_HOSTNAME=${LIVE_HOSTNAME:-"nwgstar"}
 
 # What runlevel to use if adding a DE like: XFCE, DAW, KTOWN etc...
 RUNLEVEL=${RUNLEVEL:-4}
 
 # Use the graphical syslinux menu (YES or NO)?
-SYSMENU=${SYSMENU:-"NO"}
+SYSMENU=${SYSMENU:-"YES"}
 
 # The amount of seconds we want the init script to wait to give the kernel's
 # USB subsystem time to settle. The default value of mkinitrd is "1" which
@@ -275,7 +275,7 @@ TESTINGLIST_DAW=""
 # List of kernel modules required for a live medium to boot properly;
 # Lots of HID modules added to support keyboard input for LUKS password entry;
 # Virtio modules added to experiment with liveslak in a VM.
-KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net"}
+KMODS=${KMODS:-"squashfs:overlay:loop:efivarfs:xhci-pci:ohci-pci:ehci-pci:xhci-hcd:uhci-hcd:ehci-hcd:mmc-core:mmc-block:sdhci:sdhci-pci:sdhci-acpi:rtsx_pci:rtsx_pci_sdmmc:usb-storage:uas:hid:usbhid:i2c-hid:hid-generic:hid-apple:hid-cherry:hid-logitech:hid-logitech-dj:hid-logitech-hidpp:hid-lenovo:hid-microsoft:hid_multitouch:jbd:mbcache:ext3:ext4:zstd_compress:lz4hc_compress:lz4_compress:btrfs:f2fs:jfs:xfs:isofs:fat:nls_cp437:nls_iso8859-1:msdos:vfat:exfat:ntfs:virtio_ring:virtio:virtio_blk:virtio_balloon:virtio_pci:virtio_pci_modern_dev:virtio_net:i2c-dev"}
 
 # Network kernel modules to include for NFS root support:
 NETMODS="kernel/drivers/net kernel/drivers/virtio"
@@ -2226,123 +2226,145 @@ fi
 cat << EOT >> ${LIVE_ROOTDIR}/etc/sboui/blacklist
 
 # Blacklist nwg-shell and newly added packages;
-[0-9]_nwg
+#[0-9]_nwg
 [0-9]_lngn
-Imath
-abseil-cpp
-anthy-unicode
-appstream-glib
-aom
-avahi
-clinfo
-colord
-dav1d
-fcitx5
-fcitx5-anthy
-fcitx5-chinese-addons
-fcitx5-configtool
-fcitx5-gtk
-fcitx5-hangul
-fcitx5-kkc
-fcitx5-m17n
-fcitx5-qt
-fcitx5-sayura
-fcitx5-table-extra
-fcitx5-table-other
-fcitx5-theme-breeze
-fcitx5-unikey
-fmt
-gi-docgen
-gnugo
-google-go-lang
-gspell
-gtk-layer-shell
-gtkspell3
-html5lib
-immer
-iniparser
-labplot
-labwc
-lager
-libass
-libdaemon
-libdeflate
-libdisplay-info
-libev
-libgusb
-libhandy
-libime
-libindi
-libnova
-libpaper
-libplacebo
-libsfdo
-libsoup3
-libtraceevent
-libtracefs
-libunibreak
-libxcvt
-lua
-luajit
-luajit-lgi
-lxml
-mosh
-mpv
-mujs
-nghttp3
-nodejs
-noto-emoji
-nss-mdns
-nut
-nv-codec-headers
-pahole
-perl-IO-Tty
-perl-JSON
-protobuf3
-python-alabaster
-python-babel
-python-imagesize
-python-importlib_metadata
-python-pytz
-python-smartypants
-python-snowballstemmer
-python-sphinx
-python-zipp
-python3-build
-python3-calver
-python3-editables
-python3-exceptiongroup
-python3-flit_core
-python3-glad
-python3-hatchling
-python3-installer
-python3-pluggy
-python3-psutil
-python3-pyproject-hooks
-python3-setuptools-opt
-python3-setuptools-scm-opt
-python3-tomli_w
-python3-trove-classifiers
-python3-typing-extensions
-python3-webencodings
-python3-wheel
-qt6
-rdfind
-rust-opt
-rust16
-seatd
-scdoc
-sphinx-rtd-theme
-stellarsolver
-stow
-tree-sitter
-valgrind
-wcslib
-wlroots
-wsdd2
-zug
-xcb-imdkit
-xinput_calibrator
+ Imath
+ OpenBLAS
+ abseil-cpp
+ adobe-source-code-pro-font
+ anthy-unicode
+ aom
+ appstream-glib
+ avahi
+ cargo-c
+ ccid
+ clinfo
+ cmark
+ colord
+ dav1d
+ fcitx5
+ fcitx5-anthy
+ fcitx5-chinese-addons
+ fcitx5-configtool
+ fcitx5-gtk
+ fcitx5-hangul
+ fcitx5-kkc
+ fcitx5-m17n
+ fcitx5-qt
+ fcitx5-sayura
+ fcitx5-table-extra
+ fcitx5-table-other
+ fcitx5-theme-breeze
+ fcitx5-unikey
+ fmt
+ gi-docgen
+ gnugo
+ google-go-lang
+ graphviz
+ gspell
+ gtest
+ gtk-layer-shell
+ gtksourceview4
+ gtkspell3
+ html5lib
+ immer
+ iniparser
+ intel-microcode
+ iucode_tool
+ labplot
+ labwc
+ lager
+ libass
+ libdaemon
+ libdeflate
+ libdisplay-info
+ libev
+ libgusb
+ libhandy
+ libime
+ libindi
+ libnova
+ libpaper
+ libplacebo
+ libsoup3
+ libtraceevent
+ libtracefs
+ libunibreak
+ libxcvt
+ lua
+ luajit
+ lxml
+ mold
+ moreutils
+ mosh
+ mpv
+ mujs
+ nghttp3
+ nodejs
+ noto-emoji
+ nss-mdns
+ nut
+ nv-codec-headers
+ opensc
+ pahole
+ pcsc-lite
+ perl-IO-Tty
+ perl-JSON
+ protobuf3
+ python-alabaster
+ python-babel
+ python-imagesize
+ python-importlib_metadata
+ python-pytz
+ python-smartypants
+ python-snowballstemmer
+ python-sphinx
+ python-zipp
+ python3-build
+ python3-calver
+ python3-editables
+ python3-exceptiongroup
+ python3-flit_core
+ python3-glad
+ python3-hatch_vcs
+ python3-hatchling
+ python3-hatchling
+ python3-installer
+ python3-meson-opt
+ python3-mesonpy
+ python3-numpy
+ python3-pluggy
+ python3-psutil
+ python3-pyproject-hooks
+ python3-pyproject-metadata
+ python3-setuptools-opt
+ python3-setuptools-scm-opt
+ python3-tomli_w
+ python3-trove-classifiers
+ python3-typing-extensions
+ python3-versioneer
+ python3-webencodings
+ python3-wheel
+ qt6
+ rdfind
+ rust-opt
+ rust16
+ scdoc
+ seatd
+ sphinx-rtd-theme
+ stellarsolver
+ stow
+ suitesparse
+ tree-sitter
+ universal-ctags
+ valgrind
+ wayland-utils
+ wcslib
+ wlroots
+ wsdd2
+ xcb-imdkit
+ xfce4-xkb-plugin
+ zug
 
 EOT
 
@@ -2428,6 +2450,8 @@ fi
 if [ -f var/log/packages/slackpkg+-* ] ; then
   cat <<EOQL > etc/slackpkg/post-functions.conf
 /etc/sddm.conf.new:O
+/etc/rc.d/rc.local:R
+/etc/rc.d/rc.modules.local:R
 default:K
 EOQL
 fi
