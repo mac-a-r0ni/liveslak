@@ -213,7 +213,7 @@ SL_ARCH=${SL_ARCH:-"x86_64"}
 # Root directory of a Slackware local mirror tree;
 # You can define custom repository location (must be in local filesystem)
 # for any module in the file ./pkglists/<module>.conf:
-SL_REPO=${SL_REPO:-"/home/liveslak-gfs48"}
+SL_REPO=${SL_REPO:-"/home/liveslak-gfs49"}
 DEF_SL_REPO=${SL_REPO}
 
 # The rsync URI of our default Slackware mirror server:
@@ -342,10 +342,10 @@ SQ_COMP=${SQ_COMP:-"xz"}
 LIVE_ROOTDIR=${LIVE_ROOTDIR:-"/mnt/slackwarelive"}
 
 # Directory where the live ISO image will be written:
-OUTPUT=${OUTPUT:-"/home/liveslak-gfs48"}
+OUTPUT=${OUTPUT:-"/home/liveslak-gfs49"}
 
 # Directory where we create the staging directory:
-TMP=${TMP:-"/home/liveslak-gfs48"}
+TMP=${TMP:-"/home/liveslak-gfs49"}
 
 # Toplevel directory of our staging area (this needs sufficient storage):
 LIVE_STAGING=${LIVE_STAGING:-"${TMP}/slackwarelive_staging"}
@@ -1186,7 +1186,7 @@ function create_iso() {
 
   # Time to determine the output filename, now that we know all the variables
   # and ensured that the OUTPUT directory exists:
-  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}-gfs48.iso"}
+  OUTFILE=${OUTFILE:-"${OUTPUT}/${DISTRO}${DIRSUFFIX}-live${ISOTAG}-${SL_VERSION}-gfs49.iso"}
   if [ "$USEXORR" = "NO" ]; then
     mkisofs -o "${OUTFILE}" \
       -V "${MEDIALABEL}" \
